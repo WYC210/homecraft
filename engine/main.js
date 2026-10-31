@@ -33,7 +33,7 @@ import { mountHud } from './hud.js';
 import { t, nameOf, applyLang, onLang, langSwitch } from './lang.js';
 
 const STATIONS = L.STATIONS || [], POOL = L.POOL || null, HOUSE = L.HOUSE || null;
-const inPool = POOL ? (x, z) => x >= POOL.x0 && x < POOL.x1 && z >= POOL.z0 && z < POOL.z1 : () => false;
+const inPool = L.inPool ?? (POOL ? (x, z) => x >= POOL.x0 && x < POOL.x1 && z >= POOL.z0 && z < POOL.z1 : () => false);
 const inHouse = HOUSE ? (x, z) => x >= HOUSE.x0 && x < HOUSE.x1 && z >= HOUSE.z0 && z < HOUSE.z1 : () => false;
 // Nothing to swim in: the parts of the loop that ask about water get plain answers.
 const NO_POOL = { submerged: false, fogColor: null, update() {}, warmup() {}, splash() {}, ripple() {}, exhale() {} };

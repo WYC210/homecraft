@@ -24,7 +24,7 @@ export function createWorld(stage, quality) {
   // Boxes marked { metal: true } use this; a world may swap in a real metal (see examples/terry-home's stainless.js).
   materials.boxMetal = materials.box;
   const B = L.ISLAND;
-  const grid = new VoxelGrid({ min: [B.x0, -20, B.z0], size: [B.x1 - B.x0, 34, B.z1 - B.z0] });
+  const grid = new VoxelGrid({ min: [B.x0, -20, B.z0], size: [B.x1 - B.x0, 72, B.z1 - B.z0] });
   defineBaseBlocks(grid);
   const built = buildWorld({ grid, layer: tiles.layer, materials, stage, quality, scene }) || {};
   const {

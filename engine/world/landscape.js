@@ -76,8 +76,8 @@ export function createSea(scene, hole = null) {
   geometry.setIndex(index);
   const material = new THREE.MeshBasicMaterial({ color: 0x3a8991, fog: true });
   const sea = new THREE.Mesh(geometry, material), open = new THREE.Mesh(new THREE.PlaneGeometry(900, 900), material);
-  sea.name = 'coastal-sea'; sea.position.y = -1.08;
-  open.name = 'open-sea'; open.rotation.x = -Math.PI / 2; open.position.y = -1.08; open.visible = false;
+  sea.name = 'coastal-sea'; sea.position.y = -0.32;
+  open.name = 'open-sea'; open.rotation.x = -Math.PI / 2; open.position.y = -0.32; open.visible = false;
   scene.add(sea, open);
   let mood = 'day', overcast = 0;
   const tones = { dawn: 0x526f70, morning: 0x538f94, day: 0x3a8991, dusk: 0x5c7071, night: 0x123b3e };

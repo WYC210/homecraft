@@ -5,7 +5,7 @@
 import * as L from '@world/layout.js';
 
 const ISLAND = L.ISLAND, POOL = L.POOL || null, floorAt = L.floorAt || (() => 0);
-const inPool = POOL ? (x, z) => x >= POOL.x0 && x < POOL.x1 && z >= POOL.z0 && z < POOL.z1 : () => false;
+const inPool = L.inPool ?? (POOL ? (x, z) => x >= POOL.x0 && x < POOL.x1 && z >= POOL.z0 && z < POOL.z1 : () => false);
 
 const RES = 4; // cells per metre
 export const RADIUS = 0.28;
@@ -13,6 +13,10 @@ export const SWIM_FLOOR = -1.12;
 // Floors are stored as float32, so the pool is told apart by sign, not equality.
 export const isWet = h => h < -0.5;
 const STEP = 0.6;
+// Walking down a one-block ledge is allowed; climbing one still needs a jump.
+const DROP = 1.05;
+// Is the rise from `a` up to `b` too steep (drops up to DROP are walkable)?
+const steep = (a, b) => b - a > STEP || a - b > DROP;
 
 export function createNav(grid, obstacles) {
   const x0 = ISLAND.x0, z0 = ISLAND.z0;
@@ -82,12 +86,16 @@ export function createNav(grid, obstacles) {
     const k = cellOf(x, z);
     if (k < 0 || blocked[k]) return false;
     const h = floor[k];
-    if (from !== undefined && Math.abs(h - from) > STEP && !(isWet(h) || isWet(from))) return false;
+    if (from !== undefined && steep(from, h) && !(isWet(h) || isWet(from))) return false;
     for (let a = 0; a < 8; a++) {
       const px = x + Math.cos(a * Math.PI / 4) * RADIUS, pz = z + Math.sin(a * Math.PI / 4) * RADIUS;
       const pk = cellOf(px, pz);
       if (pk < 0 || blocked[pk]) return false;
-      if (Math.abs(floor[pk] - h) > STEP && !isWet(floor[pk]) && !isWet(h)) return false;
+      // A neighbour one block higher or lower is a ledge or the threshold
+      // just crossed (doorways sit one block above the sand); past DROP the
+      // body would be standing over a cliff or buried in a wall.
+      const d = floor[pk] - h;
+      if (Math.abs(d) > DROP && !isWet(floor[pk]) && !isWet(h)) return false;
     }
     return true;
   }
@@ -140,7 +148,7 @@ export function createNav(grid, obstacles) {
       if (!passable(k, need)) return false;
       if (need >= 2 && !canStand(x, z)) return false;
       const h = floor[k];
-      if (Math.abs(h - prev) > STEP && !isWet(h) && !isWet(prev)) return false;
+      if (steep(prev, h) && !isWet(h) && !isWet(prev)) return false;
       prev = h;
     }
     return true;
@@ -196,8 +204,8 @@ export function createNav(grid, obstacles) {
         const nk = ni + nj * cols;
         if (closed[nk] || !passable(nk)) continue;
         if (di && dj && (!passable(i + di + j * cols) || !passable(i + nj * cols))) continue;
-        const dh = Math.abs(floor[nk] - floor[k]);
-        if (dh > STEP && !isWet(floor[nk]) && !isWet(floor[k])) continue;
+        const dh = steep(floor[k], floor[nk]);
+        if (dh && !isWet(floor[nk]) && !isWet(floor[k])) continue;
         // Prefer staying dry: entering the pool costs extra.
         const wet = isWet(floor[nk]) ? 3 : 1;
         const cost = g[k] + (di && dj ? Math.SQRT2 : 1) * wet;

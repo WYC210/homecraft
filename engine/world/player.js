@@ -20,10 +20,10 @@ const WALK = 3.6, RUN = 6.2, FLY = 8.5, FLY_FAST = 16, CLIMB = 6, JUMP = 6.4, GR
 // What the world has: stations, a spawn point, and optionally a house (left
 // and entered by its front door when flying) and a pool to swim in.
 const STATIONS = L.STATIONS || [], SPAWN = L.SPAWN || { x: 0, z: 0, heading: Math.PI }, ISLAND = L.ISLAND;
-const HOUSE = L.HOUSE || null, POOL = L.POOL || null;
+const HOUSE = L.HOUSE || null, POOL = L.POOL || null, BAY = L.BAY || POOL;
 const POOL_LADDER = L.POOL_LADDER || { x0: Infinity, x1: -Infinity, z: 0 };
 const inHouse = HOUSE ? (x, z) => x >= HOUSE.x0 && x < HOUSE.x1 && z >= HOUSE.z0 && z < HOUSE.z1 : () => false;
-const inPool = POOL ? (x, z) => x >= POOL.x0 && x < POOL.x1 && z >= POOL.z0 && z < POOL.z1 : () => false;
+const inPool = L.inPool ?? (POOL ? (x, z) => x >= POOL.x0 && x < POOL.x1 && z >= POOL.z0 && z < POOL.z1 : () => false);
 const DOORWAY = L.DOORWAY || [];
 const EXIT = L.EXIT || (HOUSE && { x: (HOUSE.x0 + HOUSE.x1) / 2, z: HOUSE.z1 + 2.5 });
 
@@ -37,6 +37,7 @@ const SWIM = 1.7, SWIM_FAST = 2.9, RISE = 1.5, SINK = 1.6, FLOAT = 0.5, EDGE = 0
 const surfaceLevel = pitch => Math.min(WATER - 0.18, WATER + 0.15 - 0.575 * Math.cos(pitch));
 // The lowest the middle can go: lying flat on the floor, or standing on it.
 const bedLevel = pitch => POOL.bed + 0.24 + 0.76 * Math.pow(Math.abs(Math.cos(pitch)), 1.3);
+const atSeaFloor = (x, z) => !(x >= BAY.x0 && x < BAY.x1 && z >= BAY.z0 && z < BAY.z1);
 const smooth = t => t * t * (3 - 2 * t);
 
 export function createPlayer({ avatar, nav, grid = null, ground = null, onArrive, onWater }) {
@@ -73,9 +74,26 @@ export function createPlayer({ avatar, nav, grid = null, ground = null, onArrive
       standing = here; level = here.y; island = here.site;
       return;
     }
+    // Airborne: the drift may carry the body over any standable cell whose
+    // floor is below the feet — this is what lets a jump land on a one-block
+    // ledge — and the landing height follows the cell it ends up over.
+    if (mode === 'air') {
+      const hop = (mx, mz) => {
+        if (!nav.canStand(pos.x + mx, pos.z + mz) || nav.heightAt(pos.x + mx, pos.z + mz) > y + 0.02) return false;
+        pos.x += mx; pos.z += mz; level = nav.heightAt(pos.x, pos.z); standing = null;
+        return true;
+      };
+      if (hop(dx, dz) || hop(dx, 0) || hop(0, dz)) return;
+      return;
+    }
     const out = ground?.canStand(tx, tz, level);
     if (out && (!nav.canStand(tx, tz, level) || out.y > nav.heightAt(tx, tz) + 0.02)) {
       pos.x = tx; pos.z = tz; island = out.site; level = out.y; standing = out;
+      return;
+    }
+    // Walking off a shore into the sea: swim there.
+    if (inPool(tx, tz) && !nav.canStand(tx, tz)) {
+      pos.x = tx; pos.z = tz; intoWater(level + PIVOT); island = null;
       return;
     }
     nav.move(pos, dx, dz); level = nav.heightAt(pos.x, pos.z); standing = null;
@@ -199,6 +217,7 @@ export function createPlayer({ avatar, nav, grid = null, ground = null, onArrive
   }
   // The body stays a little clear of the walls, and of the ladder's rungs.
   function inPoolBounds(x, z, c = WATER) {
+    if (atSeaFloor(x, z)) return { x, z }; // the open ring ocean: no walls
     x = Math.min(POOL.x1 - EDGE, Math.max(POOL.x0 + EDGE, x));
     z = Math.min(POOL.z1 - EDGE, Math.max(POOL.z0 + EDGE, z));
     if (c > -1.9 && x > POOL_LADDER.x0 - 0.3 && x < POOL_LADDER.x1 + 0.3) z = Math.max(z, POOL_LADDER.z + 0.32);
@@ -219,6 +238,11 @@ export function createPlayer({ avatar, nav, grid = null, ground = null, onArrive
   function wallExit(dx, dz) {
     const ladderSide = pos.x > POOL_LADDER.x0 - 0.3 && pos.x < POOL_LADDER.x1 + 0.3;
     const north = (ladderSide ? POOL_LADDER.z + 0.32 : POOL.z0 + EDGE) + 0.06;
+    // In the ring ocean: climb out wherever there is land to push against.
+    if (atSeaFloor(pos.x, pos.z)) {
+      const out = { x: pos.x + dx * 0.55, z: pos.z + dz * 0.55 };
+      return nav.canStand(out.x, out.z) ? { edge: { x: pos.x - dx * 0.25, z: pos.z - dz * 0.25 }, out, ox: dx, oz: dz } : null;
+    }
     if (dz < -0.5 && pos.z < north) return exitAt(pos.x, POOL.z0, 0, -1);
     if (dx < -0.5 && pos.x < POOL.x0 + EDGE + 0.06) return exitAt(POOL.x0, pos.z, -1, 0);
     if (dx > 0.5 && pos.x > POOL.x1 - EDGE - 0.06) return exitAt(POOL.x1, pos.z, 1, 0);
@@ -246,19 +270,22 @@ export function createPlayer({ avatar, nav, grid = null, ground = null, onArrive
   // Walking to the nearest side, diving in and swimming to (x, z).
   function enterPool(x, z) {
     if (mode !== 'ground' || island) return false;
-    const along = (v, lo, hi) => Math.min(hi - 0.6, Math.max(lo + 0.6, v));
-    const north = { x: along(x, POOL.x0, POOL.x1), z: POOL.z0 - 0.55, nx: 0, nz: 1 };
-    // Not off the ladder: beside it.
-    if (north.x > POOL_LADDER.x0 - 0.6 && north.x < POOL_LADDER.x1 + 0.6) north.x = north.x < (POOL_LADDER.x0 + POOL_LADDER.x1) / 2 ? POOL_LADDER.x0 - 0.6 : POOL_LADDER.x1 + 0.6;
-    const sides = [north, { x: POOL.x0 - 0.55, z: along(z, POOL.z0, POOL.z1), nx: 1, nz: 0 }, { x: POOL.x1 + 0.55, z: along(z, POOL.z0, POOL.z1), nx: -1, nz: 0 }];
-    const cost = s => Math.hypot(s.x - pos.x, s.z - pos.z) + 1.5 * Math.hypot(s.x - x, s.z - z);
+    // Walk to the shore cell nearest the tapped water, then dive in towards it.
     const target = inPoolBounds(x, z);
-    for (const side of sides.filter(s => nav.canStand(s.x, s.z)).sort((a, b) => cost(a) - cost(b))) {
-      if (!goTo(side.x, side.z)) continue;
-      then = () => { diveIn(side.nx, side.nz); path = [target]; };
-      return true;
+    // Search outward for the nearest standable shore cell by the tapped water.
+    let stand = null;
+    for (let r = 1; r <= 14 && !stand; r++) {
+      for (let a = 0; a < 16 && !stand; a++) {
+        const ang = a / 16 * Math.PI * 2;
+        const sx = Math.round(x + Math.cos(ang) * r), sz = Math.round(z + Math.sin(ang) * r);
+        if (nav.canStand(sx, sz)) stand = { x: sx, z: sz };
+      }
     }
-    return false;
+    if (!stand) return false;
+    const dx = x - stand.x, dz = z - stand.z, d = Math.hypot(dx, dz) || 1;
+    if (!goTo(stand.x, stand.z)) return false;
+    then = () => { diveIn(dx / d, dz / d); path = [target]; };
+    return true;
   }
   function swimTo(x, z) {
     if (mode !== 'swim' || swim.anim) return false;
@@ -566,10 +593,9 @@ export function createPlayer({ avatar, nav, grid = null, ground = null, onArrive
     if (Math.hypot(input.x, input.z) > 0.08) {
       if (path) cancel();
       ({ x: dx, z: dz } = steer(input, cameraYaw));
-      // Walking (or jumping) off the deck into the pool dives in.
+      // Walking (or jumping) off the shore into any swimmable water dives in.
       const l = Math.hypot(dx, dz);
-      if (!island && inPool(pos.x + dx / l * 0.7, pos.z + dz / l * 0.7) &&
-        pos.x > POOL.x0 - 1.2 && pos.x < POOL.x1 + 1.2 && pos.z > POOL.z0 - 1.2 && pos.z < POOL.z1 + 1.2) { diveIn(dx / l, dz / l); return; }
+      if (!island && inPool(pos.x + dx / l * 0.7, pos.z + dz / l * 0.7)) { diveIn(dx / l, dz / l); return; }
     } else if (path?.length) {
       // Consume reached waypoints in this frame so a turn does not insert a
       // stop/start tick. Corners still finish within 3.5 cm to clear door jambs.
@@ -600,6 +626,8 @@ export function createPlayer({ avatar, nav, grid = null, ground = null, onArrive
     const next = y + vy * dt;
     if (vy > 0 && solidAt(Math.floor(pos.x), Math.floor(next + 1.8), Math.floor(pos.z))) vy = 0;
     else y = next;
+    // Falling into the sea: swim, not stand on the phantom pool floor.
+    if (y <= level && inPool(pos.x, pos.z) && y <= WATER + 0.4) { intoWater(y + PIVOT, Math.min(-1.5, vy)); return; }
     if (y <= level) { y = level; vy = 0; mode = 'ground'; }
   }
 

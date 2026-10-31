@@ -1,5 +1,31 @@
+import { blockGONGLU } from './gonglu-model.js';
+
 // 1 block = 1 m. x east, z south, y up.
-export const ISLAND = { x0: -36, x1: 38, z0: -26, z1: 31 };
+// ISLAND covers the sand island AND the swimming bay south of it (the grid
+// needs cells there for the sea floor); LAND is the terrain/coast itself.
+export const ISLAND = { x0: -60, x1: 62, z0: -50, z1: 62 };
+export const LAND = { x0: -36, x1: 38, z0: -26, z1: 31 };
+// The swimming bay off the south beach: walk off the sand and swim. The
+// engine's pool water renders over this rect (surface = the sea, -0.32) and
+// the sea sheet is cut out beneath it. Spans the full island width and runs
+// well out to sea.
+// The swimmable water rect covers the whole ocean out past the fog — the
+// engine's pool water (translucent, caustics, ripples) renders over it and
+// the flat sea sheet is cut out entirely. BAY is the dug beach-entry part.
+export const POOL = { x0: -400, x1: 400, z0: -400, z1: 400, water: -0.32, bed: -3 };
+export const BAY = { x0: -36, x1: 36, z0: 29, z1: 56 };
+// Swimmable water: the bay plus the ocean ring around the island (everything
+// inside the grid but off the sand). The engine reads this for swimming.
+export const inPool = (x, z) => {
+  if (x < ISLAND.x0 || x >= ISLAND.x1 || z < ISLAND.z0 || z >= ISLAND.z1) return false;
+  // the land test is inset one cell: the terrain coast sits just inside the
+  // LAND border, and its border row has no blocks — it is open water.
+  const inLand = x >= LAND.x0 + 1 && x < LAND.x1 - 1 && z >= LAND.z0 + 1 && z < LAND.z1 - 1;
+  if (inLand) {
+    return x >= BAY.x0 && x < BAY.x1 && z >= BAY.z0 && z < BAY.z1; // the bay shallows
+  }
+  return true; // the ocean ring
+};
 export const SPAWN = { x: 0.5, z: 18, heading: Math.PI };
 export const STATIONS = [
   { id: 'mailbox', name: '留言', en: 'Mailbox', icon: 'mail', at: [0.5, 23.9], look: [0.5, 25.5] },
@@ -8,3 +34,39 @@ export const STATIONS = [
 export const MAILBOX = { x: 0.5, z: 25.5, yaw: Math.PI };
 export const PORTAL = { x: 8, z: 25.5, yaw: Math.PI };
 export const TREES = [[30, -12]];
+
+// The IKUN cottage from a litematic, east of the spawn lawn: its ground-level
+// entrance ramp starts at z = -6 and the raised floor (model layer 4) is the
+// room at world x ∈ [11, 17), z ∈ [-1, 7), four metres up. The model sits one
+// metre low (y = -1) because the world grid tops out at y = 14 — at y = 0 the
+// model's top layer would land exactly on the excluded row and vanish.
+export const MODEL_ORIGIN = { x: 10, y: -1, z: -6 };
+// The LeHun cottage from a litematic, hovering over the swimming bay: 18
+// wide centred on the bay (x -9..8), base four metres above the water (the
+// grid tops out at y = 27, so 4 is the highest the 24-layer model can sit).
+// Its floor slab (model layer 7) is floor 12 over x ∈ [-7, 7), z ∈ [29, 42).
+export const LEHUN_ORIGIN = { x: 1, y: 4, z: 34 };
+// The giant crafting-table tower (from 工作台熔炉.litematic, model z 7..22 —
+// its companion furnace tower is left out for now), on the north-west lawn.
+export const ORIGIN_GONGLU = { x: -36, y: 0, z: -16 };
+// The Cinnamoroll ferris wheel, rotated to face the beach, on the east lawn.
+export const ORIGIN_FERRIS = { x: 18, y: 0, z: -14 };
+export function floorAt(x, z) {
+  if (x >= 11 && x < 17 && z >= -1 && z < 7) return 4;
+  if (x >= 3 && x < 17 && z >= 36 && z < 50) return 12;
+  // The giant crafting-table tower: interior floor (its foundation top) and
+// the entrance step up to the porch.
+  const mx = x - ORIGIN_GONGLU.x, mz = z - ORIGIN_GONGLU.z;
+  // nav cell centres sit on .25/.75 — the ranges must cover them, not just
+  // the integer cells (the doorway and step rows were being blocked). The
+  // east wall row (centres mx 22.25/22.75) holds the side doorway; past the
+  // mx <= 22 bound it read as unsupported sand and the side door was walled.
+  if (mx >= 7 && mx < 23 && mz >= 14 && mz < 30) return 1;
+  if (mx >= 13 && mx <= 16 && mz >= 13 && mz < 14) return 0.5; // the north entry step
+  if (mx >= 13 && mx <= 17 && mz >= 30 && mz < 31) return 0.5;
+  return 0;
+}
+
+// The baked lamp light covers both litematic cottages (min corner, size in
+// metres, texels) — tall enough for the LeHun glowstone up in the roof.
+export const LIGHT_VOLUME = { min: [-30, -1, -14], extent: [56, 22, 42], size: [56, 22, 42] };
