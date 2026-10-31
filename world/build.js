@@ -7,6 +7,7 @@ import { buildLitematicLEHUN } from './lehun-model.js';
 import { buildLitematicGONGLU } from './gonglu-model.js';
 import { buildLitematicFERRIS } from './ferris-model.js';
 import { buildSeaToys } from './sea.js';
+import { furnishGONGLU } from './gonglu-furnish.js';
 
 // Two cottages rebuilt one-to-one from litematics. The palette keeps every
 // block's properties, so stairs, slabs, doors, panes and lanterns come out as
@@ -32,7 +33,8 @@ export function build({ grid, layer, materials, stage }) {
     grid.fill(x, -5, z, x + 1, -3, z + 1, 'sand');
   }
   const B = new BoxBatch(layer);
-  const walk = [], bakes = [];
+  const walk = [], bakes = [], obstacles = [];
+  const surfaces = {};
   const emitShape = (name, props, wx, wy, wz, kind) => {
     const cx = wx + 0.5, cz = wz + 0.5, L = lookFor(name);
     if (kind === 'stairs') {
@@ -129,6 +131,13 @@ export function build({ grid, layer, materials, stage }) {
   buildLitematicGONGLU(grid, ORIGIN_GONGLU, mapGONGLU, () => 'model', (name, props, wx, wy, wz) => {
     const mx = wx - ORIGIN_GONGLU.x, mz = wz - ORIGIN_GONGLU.z;
     if (mx < 7 || mx > 22 || mz < 14 || mz > 30) return;
+    // mapGONGLU flattens the interior floor (my 1) away and clears the hall's
+    // mid-air decor (my 2..10, see mapGONGLU); emitShape runs for every model
+    // cell regardless, so the dropped layer is dropped here too — only the
+    // hanging lanterns and chains stay.
+    const my = wy - ORIGIN_GONGLU.y;
+    if (my >= 1 && my <= 10 && mx >= 8 && mx <= 21 && mz >= 15 && mz <= 28 &&
+        !/lantern|chain/.test(name)) return;
     emitShape(name, props, wx, wy, wz, kindGONGLU(name));
   });
   // The Cinnamoroll ferris wheel, rotated to face the beach.
@@ -145,9 +154,15 @@ export function build({ grid, layer, materials, stage }) {
   toys = buildSeaToys(layer, materials);
   stage.scene.add(toys.group);
   const forest = buildForest(grid, layer, TREES);
+  // Furnish the crafting tower's hall as a little home (obstacles keep the
+  // nav clear around each piece; the TV rides surfaces.tvScreen).
+  const planes = furnishGONGLU({ B, obstacles, bakes, surfaces });
   return {
     batches: { model: B },
     bakes,
+    obstacles,
+    surfaces,
+    planes,
     forest,
     sites: [toys, makeModelSite(walk)],
   };
@@ -249,6 +264,11 @@ function mapGONGLU(name, props = {}, mx, my, mz) {
   // part of the tower face pattern.
   if (/chest|barrel|hopper|_bed$|^minecraft:water|jukebox|ender_chest|crafting_table|furnace|smoker|stonecutter|smithing_table|enchanting_table|grindstone|lectern|brewing_stand|^minecraft:anvil|wall_sign|potted_|flower_pot|sapling|coral|amethyst|dripstone|skull|tripwire|candle|campfire|tulip|poppy|orchid|daisy|lily|fern|torchflower/.test(name)) return null;
   if (name === 'minecraft:dark_oak_door') return null; // the entrance stays open
+  // The hall is furnished as a home (gonglu-furnish.js): the model's own hall
+  // decor — chest-wall shelf columns, wall signs, leaf bands, floating
+  // trapdoor shelves — comes out. Bookshelves stay (the study nook's wall).
+  if (my >= 2 && my <= 10 && mx >= 8 && mx <= 21 && mz >= 15 && mz <= 28 &&
+      !/bookshelf|^minecraft:lantern|^minecraft:chain/.test(name)) return null;
   // The interior floor: one flat tan layer (the raised bookshelf/green/moss
   // patches come out, the foundation goes tan).
   if (my === 0 && mx >= 7 && mx <= 22 && mz >= 14 && mz <= 29) return 'g_sjungle';
