@@ -40,7 +40,7 @@ export const TREES = [[30, -12]];
 // room at world x ∈ [11, 17), z ∈ [-1, 7), four metres up. The model sits one
 // metre low (y = -1) because the world grid tops out at y = 14 — at y = 0 the
 // model's top layer would land exactly on the excluded row and vanish.
-export const MODEL_ORIGIN = { x: 10, y: -1, z: -6 };
+export const MODEL_ORIGIN = { x: 4, y: -1, z: -6 };
 // The LeHun cottage from a litematic, hovering over the swimming bay: 18
 // wide centred on the bay (x -9..8), base four metres above the water (the
 // grid tops out at y = 27, so 4 is the highest the 24-layer model can sit).
@@ -52,8 +52,11 @@ export const ORIGIN_GONGLU = { x: -36, y: 0, z: -16 };
 // The Cinnamoroll ferris wheel, rotated to face the beach, on the east lawn.
 export const ORIGIN_FERRIS = { x: 18, y: 0, z: -14 };
 export function floorAt(x, z) {
-  if (x >= 11 && x < 17 && z >= -1 && z < 7) return 4;
-  if (x >= 3 && x < 17 && z >= 36 && z < 50) return 12;
+  if (x >= 5 && x < 11 && z >= -1 && z < 7) return 4;
+  // The LeHun hall floor and its doorway threshold — nav cell centres sit on
+  // .25/.75, so the ranges must cover them (the west strip mx=1 was missed).
+  if (x >= 2 && x < 17 && z >= 36 && z < 50) return 12;
+  if (x >= 9 && x < 11 && z >= 50 && z < 51) return 12;
   // The giant crafting-table tower: interior floor (its foundation top) and
 // the entrance step up to the porch.
   const mx = x - ORIGIN_GONGLU.x, mz = z - ORIGIN_GONGLU.z;
@@ -68,5 +71,6 @@ export function floorAt(x, z) {
 }
 
 // The baked lamp light covers both litematic cottages (min corner, size in
-// metres, texels) — tall enough for the LeHun glowstone up in the roof.
-export const LIGHT_VOLUME = { min: [-30, -1, -14], extent: [56, 22, 42], size: [56, 22, 42] };
+// metres, texels). The LeHun loft reaches y=27, so the volume must include
+// its ceiling fixtures as well as the lower gym.
+export const LIGHT_VOLUME = { min: [-30, -1, -16], extent: [68, 30, 50], size: [68, 30, 50] };

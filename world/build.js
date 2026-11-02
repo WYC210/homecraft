@@ -8,6 +8,7 @@ import { buildLitematicGONGLU } from './gonglu-model.js';
 import { buildLitematicFERRIS } from './ferris-model.js';
 import { buildSeaToys } from './sea.js';
 import { furnishGONGLU } from './gonglu-furnish.js';
+import { furnishLeHun } from './lehun-furnish.js';
 
 // Two cottages rebuilt one-to-one from litematics. The palette keeps every
 // block's properties, so stairs, slabs, doors, panes and lanterns come out as
@@ -35,8 +36,8 @@ export function build({ grid, layer, materials, stage }) {
   const B = new BoxBatch(layer);
   const walk = [], bakes = [], obstacles = [];
   const surfaces = {};
-  const emitShape = (name, props, wx, wy, wz, kind) => {
-    const cx = wx + 0.5, cz = wz + 0.5, L = lookFor(name);
+  const emitShape = (name, props, wx, wy, wz, kind, lookOverride = null) => {
+    const cx = wx + 0.5, cz = wz + 0.5, L = lookOverride ?? lookFor(name);
     if (kind === 'stairs') {
       // One metre a step, drawn as two half-metre treads. The walk surface is
       // registered in thirds: the engine's site walker treats any rise over
@@ -122,9 +123,63 @@ export function build({ grid, layer, materials, stage }) {
     }
   };
   buildLitematicIKUN(grid, MODEL_ORIGIN, mapIKUN, () => 'model',
-    (name, props, wx, wy, wz) => emitShape(name, props, wx, wy, wz, kindIKUN(name, wx - MODEL_ORIGIN.x, wz - MODEL_ORIGIN.z)));
-  buildLitematicLEHUN(grid, LEHUN_ORIGIN, mapLeHun, () => 'model',
-    (name, props, wx, wy, wz) => emitShape(name, props, wx, wy, wz, kindLeHun(name)));
+    (name, props, wx, wy, wz) => {
+      const mx = wx - MODEL_ORIGIN.x, my = wy - MODEL_ORIGIN.y, mz = wz - MODEL_ORIGIN.z;
+      // The chicken's white eye rods were stored on the side of the head
+      // (x=1/6, z=8). Move each pair onto the matching front-eye position.
+      if (name === 'minecraft:end_rod' && (mx === 1 || mx === 6) &&
+          (my === 6 || my === 7) && mz === 8) {
+        const eyeX = mx === 1 ? 2 : 5;
+        emitShape(name, props, MODEL_ORIGIN.x + eyeX, wy, MODEL_ORIGIN.z + 12, kindIKUN(name, eyeX, 12));
+        return;
+      }
+      emitShape(name, props, wx, wy, wz, kindIKUN(name, mx, mz));
+    });
+  // IKUN sits apart from the wheel, so use a compact five-point fill rather
+  // than a real-time light. The sources cover the face, side panels and feet
+  // while staying inside the existing baked LIGHT_VOLUME.
+  const ix = MODEL_ORIGIN.x + 4, iz = MODEL_ORIGIN.z + 8;
+  bakes.push(
+    { id: 'ikun-fill-front', position: [ix, 5.5, MODEL_ORIGIN.z + 16.5], power: 5.5, radius: 9.5, direction: null },
+    { id: 'ikun-fill-back', position: [ix, 5.5, MODEL_ORIGIN.z - 0.5], power: 3.5, radius: 8.5, direction: null },
+    { id: 'ikun-fill-west', position: [MODEL_ORIGIN.x - 1.5, 5.5, iz], power: 4.5, radius: 8.5, direction: null },
+    { id: 'ikun-fill-east', position: [MODEL_ORIGIN.x + 9.5, 5.5, iz], power: 4.5, radius: 8.5, direction: null },
+    { id: 'ikun-fill-top', position: [ix, 12.5, iz], power: 2.5, radius: 7.5, direction: null },
+    { id: 'ikun-head-front', position: [ix, 8.5, MODEL_ORIGIN.z + 13.5], power: 5.5, radius: 6.5, direction: null },
+    { id: 'ikun-head-top', position: [ix, 15.5, MODEL_ORIGIN.z + 14], power: 7, radius: 7.5, direction: null },
+    { id: 'ikun-head-west', position: [MODEL_ORIGIN.x - 1, 8.5, iz], power: 3.5, radius: 7, direction: null },
+    { id: 'ikun-head-east', position: [MODEL_ORIGIN.x + 9, 8.5, iz], power: 3.5, radius: 7, direction: null },
+  );
+  buildLitematicLEHUN(grid, LEHUN_ORIGIN, mapLeHun, () => 'model', (name, props, wx, wy, wz) => {
+    const mx = wx - 1, my = wy - 4, mz = wz - 34;
+    // Match mapLeHun's upper-room cleanup for non-block shapes as well. The
+    // litematic emits stairs, slabs and panels separately from grid blocks.
+    if (my >= 15 && my < 23 && mx >= 2 && mx <= 15 && mz >= 2 && mz <= 15) return;
+    // Keep the new east stairwell and its upper landing clear of the model's
+    // wall/trim, including enough headroom for the 1.8 m character.
+    if (wx >= 15 && wx < 17 && wz >= 36 && wz < 50 && wy >= 13 && wy < 22) return;
+    if (wx >= 14 && wx < 17 && wz >= 40 && wz < 44 && wy >= 19 && wy < 22) return;
+    // The leisure loft's floor (lehun-furnish, top y=20) cuts through the
+    // model's bamboo grove at the north bed — keep the culms below it. The
+    // west garden's plants would poke through the new floating stair too.
+    if (wy >= 18 && wx >= 4 && wx <= 13 && wz >= 36 && wz <= 40 && /bamboo|dripleaf|stem/.test(name)) return;
+    if (wy >= 13 && wx >= 2 && wx <= 4 && wz >= 40 && wz <= 47 && /bamboo|dripleaf|stem/.test(name)) return;
+    // The hall band's old furniture and the dropped upper clutter leave the
+    // shape emitter as well.
+    if (lehunHallBlock(name, mx, my, mz)) return;
+    if (my >= 12 && mx >= 2 && mx <= 15 && mz >= 2 && mz <= 15 &&
+        /stained_glass|shulker|trapdoor|banner|chain|grindstone|hopper/.test(name)) return;
+    if (my >= 8 && my <= 15 && mx >= 2 && mx <= 4 && mz >= 2 && mz <= 15 && !/moss/.test(name)) return;
+    emitShape(name, props, wx, wy, wz, kindLeHun(name));
+  });
+  // The custom stair is rendered in the shared batch, so also remove the
+  // model voxels in its shaft from the navigation/collision grid.
+  for (let x = 15; x < 17; x++) for (let z = 36; z < 50; z++) {
+    for (let y = 13; y < 22; y++) grid.set(x, y, z, null);
+  }
+  for (let x = 14; x < 17; x++) for (let z = 40; z < 44; z++) {
+    for (let y = 19; y < 22; y++) grid.set(x, y, z, null);
+  }
   // The giant crafting-table tower (its furnace companion waits in the model
   // data: after the -90° rotation it occupies model x 7..22, z < 14 / > 29 —
   // left out for now).
@@ -142,8 +197,27 @@ export function build({ grid, layer, materials, stage }) {
   });
   // The Cinnamoroll ferris wheel, rotated to face the beach.
   buildLitematicFERRIS(grid, ORIGIN_FERRIS, mapFERRIS, () => 'model', (name, props, wx, wy, wz) => {
-    emitShape(name, props, wx, wy, wz, kindFERRIS(name));
+    const mx = wx - ORIGIN_FERRIS.x, my = wy - ORIGIN_FERRIS.y, mz = wz - ORIGIN_FERRIS.z;
+    emitShape(name, props, wx, wy, wz, kindFERRIS(name), ferrisLookFor(name, mx, my, mz));
   });
+  // The wheel sits beyond the original cottage lighting volume. These baked
+  // sources keep its structure readable at night without real-time lights.
+  const fx = ORIGIN_FERRIS.x + 7.5, fy = ORIGIN_FERRIS.y + 25, fz = ORIGIN_FERRIS.z + 21.5;
+  bakes.push(
+    { id: 'ferris-warm-center', position: [fx, fy, fz], power: 5, radius: 18, direction: null },
+    { id: 'ferris-warm-top', position: [fx, fy + 13, fz], power: 3, radius: 13, direction: null },
+    { id: 'ferris-warm-bottom', position: [fx, fy - 13, fz], power: 3, radius: 13, direction: null },
+  );
+  // Each gondola gets a small baked source as well as emissive surfaces, so
+  // its window and lower edge remain readable when the wheel is in shadow.
+  const gondolas = [
+    [7.5, 7.5, 21.5], [7.5, 13.5, 10.5], [7.5, 13.5, 31.5],
+    [7.5, 24.5, 4.5], [7.5, 24.5, 38.5], [7.5, 41.5, 21.5],
+  ];
+  gondolas.forEach(([x, y, z], i) => bakes.push({
+    id: `ferris-gondola-${i}`, position: [ORIGIN_FERRIS.x + x, y, ORIGIN_FERRIS.z + z],
+    power: 1.8, radius: 4.5, direction: null,
+  }));
   // The north doorway needs entry steps like the south one (the floor drops
   // a full metre to the sand — the nav refuses steps over 0.6 m).
   for (let mx = 13; mx <= 16; mx++) {
@@ -155,8 +229,12 @@ export function build({ grid, layer, materials, stage }) {
   stage.scene.add(toys.group);
   const forest = buildForest(grid, layer, TREES);
   // Furnish the crafting tower's hall as a little home (obstacles keep the
-  // nav clear around each piece; the TV rides surfaces.tvScreen).
+  // nav clear around each piece; the TV rides surfaces.tvScreen), then move
+  // LeHun cottage: a cherry gym below and a leisure loft above — its floor
+  // pink lounge floor and stair register site treads into `walk` before the
+  // site is built.
   const planes = furnishGONGLU({ B, obstacles, bakes, surfaces });
+  planes.push(...furnishLeHun({ B, walk, obstacles, bakes }));
   return {
     batches: { model: B },
     bakes,
@@ -185,15 +263,19 @@ function mapIKUN(name, props = {}, mx, my, mz) {
   if (/_bed$|bell|brewing_stand|flower_pot|potted_|birch_fence|loom/.test(name)) return null;
   if (/stained_glass/.test(name)) return name.includes('yellow') ? 'i_glass_y' : 'i_glass';
   if (name === 'minecraft:white_concrete') return 'i_white';
-  if (name === 'minecraft:black_concrete') return 'i_black';
-  if (name === 'minecraft:light_gray_concrete') return 'i_lgray';
+  if (name === 'minecraft:black_concrete') return my <= 9 && mz >= 5 && mz <= 12 ? 'i_head_black' : 'i_black';
+  if (name === 'minecraft:light_gray_concrete') return ikunHeadTopAt(mx, my, mz) ? 'i_head_lgray' : 'i_lgray';
   if (name === 'minecraft:yellow_concrete') return 'i_yellow';
   if (name === 'minecraft:orange_concrete') return 'i_orange';
   if (name === 'minecraft:red_concrete') return 'i_red';
-  if (name === 'minecraft:light_gray_terracotta') return 'i_terra';
-  if (name === 'minecraft:light_gray_wool') return 'i_wool';
+  if (name === 'minecraft:light_gray_terracotta') return ikunHeadTopAt(mx, my, mz) ? 'i_head_terra' : 'i_terra';
+  if (name === 'minecraft:light_gray_wool') return my <= 9 && mz >= 5 && mz <= 12 || ikunHeadTopAt(mx, my, mz) ? 'i_head_gray' : 'i_wool';
   if (name === 'minecraft:light_gray_shulker_box') return 'i_lgray';
   return null; // everything else is a shape (carpets, rods, banners)
+}
+
+function ikunHeadTopAt(mx, my, mz) {
+  return my >= 9 && my <= 14 && mz >= 11;
 }
 
 function kindIKUN(name, mx, mz) {
@@ -207,13 +289,35 @@ function kindIKUN(name, mx, mz) {
   return null;
 }
 
-// ——— LeHun cottage (18×24×18) ———
-function mapLeHun(name) {
-  if (name === 'minecraft:air') return null;
+  // ——— LeHun cottage (18×24×18) ———
+  const lehunHallBlock = (name, mx, my, mz) =>
+    // The ground-hall band: the model's own furniture — cherry log pillars,
+    // shulker stools, leaf piles, campfires, pots — makes way for the gym.
+    // The pillars and leaf piles stand up to four blocks tall (the row's end
+    // posts are capped higher).
+    my >= 7 && my <= 12 && mx >= 1 && mx <= 15 && mz >= 2 && mz <= 15 &&
+    /stripped_cherry_log|shulker|cherry_leaves|campfire|decorated_pot|_stairs/.test(name);
+
+  function mapLeHun(name, props = {}, mx, my, mz) {
+    if (name === 'minecraft:air') return null;
+    // The upper room is rebuilt by lehun-furnish.js. Keep the shell, but remove
+    // every old interior block so furniture and stair fragments cannot leak in.
+    if (my >= 15 && my < 23 && mx >= 2 && mx <= 15 && mz >= 2 && mz <= 15) return null;
+    if (lehunHallBlock(name, mx, my, mz)) return null;
+    // The west slab staircase is rebuilt as floating half-slabs in
+    // lehun-furnish.js — the model's solid stair core (inboard of the west
+    // wall at mx 1) comes out; the moss garden bed stays. Interior stained
+    // glass and leftover loft furniture read as scattered clutter overhead;
+    // out as well.
+    if (my >= 8 && my <= 15 && mx >= 2 && mx <= 4 && mz >= 2 && mz <= 15 && !/moss/.test(name)) return null;
+    if (my >= 12 && mx >= 2 && mx <= 15 && mz >= 2 && mz <= 15 &&
+        /stained_glass|shulker|trapdoor|banner|chain|grindstone|hopper/.test(name)) return null;
   // Loose furniture and small flora stay out until the interior gets furnished.
   if (/chest|barrel|crafting_table|furnace|brewing_stand|stonecutter|grindstone|hopper|bookshelf|_bed$|flower_pot|potted_|short_grass|tall_grass|lily_of_the_valley|rose_bush|oxeye_daisy|white_tulip|cornflower|lilac|azalea|peony|spore_blossom|wall_sign|bamboo_sapling|carpet$/.test(name)) return null;
   if (name === 'minecraft:cherry_door') return null; // the entrance stays open
   if (/stained_glass/.test(name)) {
+    // Panes render as thin shapes only — as grid blocks they double up.
+    if (/_pane$/.test(name)) return null;
     if (/pink/.test(name)) return 'l_glass_p';
     if (/light_blue/.test(name)) return 'l_glass_lb';
     if (/cyan/.test(name)) return 'l_glass_cy';
@@ -343,16 +447,42 @@ function mapFERRIS(name, props = {}, mx, my, mz) {
   if (name === 'minecraft:air') return null;
   if (name === 'minecraft:birch_door') return null;
   if (name === 'minecraft:smooth_stone_slab' && props.type === 'double') return 'g_sstone';
-  if (/stained_glass/.test(name)) return name.includes('light_blue') ? 'l_glass_lb' : 'i_glass';
-  if (name === 'minecraft:light_blue_concrete') return 'g_lblue';
-  if (name === 'minecraft:white_concrete') return 'i_white';
-  if (name === 'minecraft:pink_concrete') return 'g_pinkc';
-  if (name === 'minecraft:quartz_block') return 'g_quartz';
+  if (/stained_glass/.test(name)) {
+    if (ferrisGondolaAt(mx, my, mz)) return 'f_cabin_glass';
+    return name.includes('light_blue') ? 'l_glass_lb' : 'i_glass';
+  }
+  if (name === 'minecraft:light_blue_concrete') return ferrisGondolaAt(mx, my, mz) ? 'f_cabin' : 'f_lblue';
+  if (name === 'minecraft:white_concrete') return ferrisFaceAt(mx, my, mz) ? 'f_face' : 'f_white';
+  if (name === 'minecraft:pink_concrete') return 'f_pink';
+  if (name === 'minecraft:quartz_block') return ferrisGondolaAt(mx, my, mz) ? 'f_cabin_frame' : 'f_quartz';
   if (name === 'minecraft:sea_lantern') return 'g_slantern';
   if (name === 'minecraft:redstone_lamp') return 'g_rslamp';
-  if (name === 'minecraft:redstone_block') return 'i_red';
-  if (name === 'minecraft:birch_planks') return 'g_birch';
+  if (name === 'minecraft:redstone_block') return 'f_red';
+  if (name === 'minecraft:birch_planks') return 'f_birch';
   return null; // stairs, slabs, rods, panes and plates are shapes
+}
+
+function ferrisLookFor(name, mx, my, mz) {
+  if (ferrisGondolaAt(mx, my, mz)) {
+    if (/stained_glass_pane/.test(name)) return FERRIS_LOOKS.cabinGlass;
+    if (/^minecraft:birch_/.test(name)) return FERRIS_LOOKS.cabinWood;
+    if (/^minecraft:quartz_/.test(name)) return FERRIS_LOOKS.cabinFrame;
+    if (/end_rod|pressure_plate/.test(name)) return FERRIS_LOOKS.cabinGlow;
+  }
+  if (/^minecraft:birch_/.test(name)) return FERRIS_LOOKS.birch;
+  if (/^minecraft:quartz_/.test(name)) return FERRIS_LOOKS.quartz;
+  return null;
+}
+
+function ferrisFaceAt(mx, my, mz) {
+  return (mx === 2 || mx === 10) && my >= 18 && my <= 36 && mz >= 7 && mz <= 35;
+}
+
+function ferrisGondolaAt(mx, my, mz) {
+  return (my >= 6 && my <= 9 && mz >= 19 && mz <= 23) ||
+    (my >= 12 && my <= 15 && (mz >= 8 && mz <= 12 || mz >= 30 && mz <= 34)) ||
+    (my >= 23 && my <= 26 && (mz >= 2 && mz <= 6 || mz >= 36 && mz <= 40)) ||
+    (my >= 40 && my <= 43 && mz >= 19 && mz <= 23);
 }
 
 function kindFERRIS(name) {
@@ -370,7 +500,11 @@ function defineModelBlocks(grid) {
   // product lands on the measured average.
   grid.define('i_white', { tex: { all: 'paint' }, tint: 0xcfd5d6, merge: true, map: '#cfd5d6' });
   grid.define('i_black', { tex: { all: 'paint' }, tint: 0x1d1d21, merge: true, map: '#1d1d21' });
+  grid.define('i_head_black', { tex: { all: 'paint' }, tint: 0x243039, emissive: 0.24, merge: true, map: '#243039' });
   grid.define('i_lgray', { tex: { all: 'paint' }, tint: 0x9ba1a6, merge: true, map: '#9ba1a6' });
+  grid.define('i_head_lgray', { tex: { all: 'paint' }, tint: 0xb7c2c7, emissive: 0.34, merge: true, map: '#b7c2c7' });
+  grid.define('i_head_terra', { tex: { all: 'paint' }, tint: 0xa47b6d, emissive: 0.3, merge: true, map: '#a47b6d' });
+  grid.define('i_head_gray', { tex: { all: 'paint' }, tint: 0xaebbc4, emissive: 0.28, merge: true, map: '#aebbc4' });
   grid.define('i_terra', { tex: { all: 'paint' }, tint: 0x876b62, merge: true, map: '#876b62' });
   grid.define('i_yellow', { tex: { all: 'paint' }, tint: 0xf8c527, merge: true, map: '#f8c527' });
   grid.define('i_orange', { tex: { all: 'paint' }, tint: 0xe06101, merge: true, map: '#e06101' });
@@ -442,6 +576,18 @@ function defineModelBlocks(grid) {
   grid.define('g_pinkc', { tex: { all: 'paint' }, tint: 0xe9a3b0, merge: true, map: '#e9a3b0' });
   grid.define('g_slantern', { tex: { all: 'paint' }, tint: 0xbcd6cc, emissive: 1, map: '#bcd6cc' });
   grid.define('g_rslamp', { tex: { all: 'paint' }, tint: 0xb0653a, emissive: 1, map: '#b0653a' });
+  // Ferris wheel finishes retain their daytime colours while giving the night
+  // scene a readable silhouette; the face and gondolas carry the strongest glow.
+  grid.define('f_lblue', { tex: { all: 'paint' }, tint: 0x9cb0ce, emissive: 0.42, merge: true, map: '#6f8ea9' });
+  grid.define('f_white', { tex: { all: 'paint' }, tint: 0xcfd5d6, emissive: 0.3, merge: true, map: '#cfd5d6' });
+  grid.define('f_pink', { tex: { all: 'paint' }, tint: 0xe9a3b0, emissive: 0.48, merge: true, map: '#e9a3b0' });
+  grid.define('f_quartz', { tex: { all: 'paint' }, tint: 0xece9e2, emissive: 0.24, merge: true, map: '#ece9e2' });
+  grid.define('f_red', { tex: { all: 'paint' }, tint: 0xa93121, emissive: 0.42, merge: true, map: '#a93121' });
+  grid.define('f_birch', { tex: { all: 'paint' }, tint: 0xd7c185, emissive: 0.18, merge: true, map: '#d7c185' });
+  grid.define('f_face', { tex: { all: 'paint' }, tint: 0xfff1d6, emissive: 0.95, merge: true, map: '#fff1d6' });
+  grid.define('f_cabin', { tex: { all: 'paint' }, tint: 0xaed7eb, emissive: 0.72, merge: true, map: '#aed7eb' });
+  grid.define('f_cabin_frame', { tex: { all: 'paint' }, tint: 0xffe7b0, emissive: 0.52, merge: true, map: '#ffe7b0' });
+  grid.define('f_cabin_glass', { kind: 'glass', tex: { all: 'glass' }, glass: true, tint: 0xd9f5ff, emissive: 0.86, merge: true, map: '#d9f5ff' });
 }
 
 // MC stair "facing" is the ascent direction (the full-height side).
@@ -467,6 +613,15 @@ const LOOKS = {
   glow: { tex: 'paint', tint: 0xffd9a0, emissive: 1 },
   flame: { tex: 'paint', tint: 0xffb66e, emissive: 1 },
   rod: { tex: 'paint', tint: 0xf6f2e2, emissive: 1 },
+};
+
+const FERRIS_LOOKS = {
+  birch: { tex: 'paint', tint: 0xd7c185, emissive: 0.18 },
+  quartz: { tex: 'paint', tint: 0xece9e2, emissive: 0.24 },
+  cabinWood: { tex: 'paint', tint: 0xf5c77e, emissive: 0.48 },
+  cabinFrame: { tex: 'paint', tint: 0xffe7b0, emissive: 0.52 },
+  cabinGlow: { tex: 'paint', tint: 0xfff0b8, emissive: 0.9 },
+  cabinGlass: { tex: 'glass', glass: true, tint: 0xd9f5ff, emissive: 0.86 },
 };
 
 function lookFor(name) {

@@ -91,8 +91,9 @@ export function createPlayer({ avatar, nav, grid = null, ground = null, onArrive
       pos.x = tx; pos.z = tz; island = out.site; level = out.y; standing = out;
       return;
     }
-    // Walking off a shore into the sea: swim there.
-    if (inPool(tx, tz) && !nav.canStand(tx, tz)) {
+    // Walking off a shore into the sea: swim there. Only at water level, so
+    // a blocked step inside the stilted cottage reads as a wall, not a dive.
+    if (inPool(tx, tz) && level <= WATER + 0.6 && !nav.canStand(tx, tz)) {
       pos.x = tx; pos.z = tz; intoWater(level + PIVOT); island = null;
       return;
     }
@@ -481,10 +482,12 @@ export function createPlayer({ avatar, nav, grid = null, ground = null, onArrive
   // the closest point of the home island, a floating island or a peak.
   function stopFlying() {
     if (mode !== 'fly') return false;
-    // Over the pool, the player simply drops into it.
-    if (inPool(pos.x, pos.z)) { dropIn(); return true; }
+    // Land on whatever floor is below first — the stilted LeHun cottage stands
+    // over the bay, so inPool alone must not mean open water.
     const below = floorBelow(pos.x, pos.z, y);
     if (below.landable && clearDrop(below.y)) { mode = 'air'; vy = 0; island = below.island; level = below.y; pilot = null; return true; }
+    // Over open water with nothing to stand on, the player simply drops in.
+    if (inPool(pos.x, pos.z) && !nav.heightAt(pos.x, pos.z)) { dropIn(); return true; }
     const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
     const spots = [{ x: clamp(pos.x, ISLAND.x0 + 3, ISLAND.x1 - 3), z: clamp(pos.z, ISLAND.z0 + 3, ISLAND.z1 - 3) }];
     if (ground) spots.push(...ground.spots());
@@ -594,8 +597,13 @@ export function createPlayer({ avatar, nav, grid = null, ground = null, onArrive
       if (path) cancel();
       ({ x: dx, z: dz } = steer(input, cameraYaw));
       // Walking (or jumping) off the shore into any swimmable water dives in.
+      // A spot the walk grid gives a floor to (the stilted LeHun cottage
+      // stands over the water) — or one a site serves a tread on (its entry
+      // slab) — is ground, however far out it sits.
       const l = Math.hypot(dx, dz);
-      if (!island && inPool(pos.x + dx / l * 0.7, pos.z + dz / l * 0.7)) { diveIn(dx / l, dz / l); return; }
+      const aheadX = pos.x + dx / l * 0.7, aheadZ = pos.z + dz / l * 0.7;
+      const aheadGround = nav.heightAt(aheadX, aheadZ) || (ground && ground.topAt(aheadX, aheadZ, level + 0.7));
+      if (!island && inPool(aheadX, aheadZ) && !aheadGround) { diveIn(dx / l, dz / l); return; }
     } else if (path?.length) {
       // Consume reached waypoints in this frame so a turn does not insert a
       // stop/start tick. Corners still finish within 3.5 cm to clear door jambs.

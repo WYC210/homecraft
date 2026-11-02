@@ -35,8 +35,10 @@ export function createNav(grid, obstacles) {
     const k = i + j * cols;
     const x = x0 + (i + 0.5) / RES, z = z0 + (j + 0.5) / RES;
     const bx = Math.floor(x), bz = Math.floor(z);
-    // The pool is water: swimming (player.js) takes over there, not the walk grid.
-    if (inPool(x, z)) { floor[k] = 0; blocked[k] = 1; continue; }
+    // The pool is water: swimming (player.js) takes over there, not the walk
+    // grid. A cell with a real floor (the stilted LeHun cottage stands over
+    // the water) is land, not sea.
+    if (inPool(x, z) && !floorAt(x, z)) { floor[k] = 0; blocked[k] = 1; continue; }
     const f = floorAt(x, z);
     floor[k] = f;
     const by = Math.floor(f + 0.01);

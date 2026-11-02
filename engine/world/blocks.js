@@ -36,12 +36,13 @@ const BOX_UV = /* glsl */`
 const VOXEL_VERTEX = /* glsl */`
   attribute vec2 tileUv;
   attribute float tileLayer;
+  attribute float tileEmissive;
 `;
 
 const VOXEL_UV = /* glsl */`
   #include <begin_vertex>
   vTex = vec3(tileUv, tileLayer);
-  vEmissive = 0.0;
+  vEmissive = tileEmissive;
 `;
 
 // Crossed quads for flowers and grass tufts; the tops sway in the wind.

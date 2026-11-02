@@ -105,7 +105,7 @@ export class VoxelGrid {
     const buckets = new Map();
     const bucket = (g, kind) => {
       const key = g + ':' + kind;
-      if (!buckets.has(key)) buckets.set(key, { g, kind, pos: [], nor: [], uv: [], lay: [], col: [], idx: [], surfaces: new Map() });
+      if (!buckets.has(key)) buckets.set(key, { g, kind, pos: [], nor: [], uv: [], lay: [], em: [], col: [], idx: [], surfaces: new Map() });
       return buckets.get(key);
     };
     const [sx, sy, sz] = this.size;
@@ -143,8 +143,9 @@ export class VoxelGrid {
           const p = [x + face.o[0], y + face.o[1], z + face.o[2]];
           const dot = a => p[0] * a[0] + p[1] * a[1] + p[2] * a[2];
           const depth = dot(face.n), u = dot(face.u), v = dot(face.v);
-          const key = `${f}:${depth}:${lay}:${t.tint ?? 0xffffff}`;
-          if (!b.surfaces.has(key)) b.surfaces.set(key, { face, depth, lay, color: [tint.r, tint.g, tint.b], cells: new Map() });
+          const emissive = t.emissive ?? 0;
+          const key = `${f}:${depth}:${lay}:${t.tint ?? 0xffffff}:${emissive}`;
+          if (!b.surfaces.has(key)) b.surfaces.set(key, { face, depth, lay, emissive, color: [tint.r, tint.g, tint.b], cells: new Map() });
           b.surfaces.get(key).cells.set(`${u},${v}`, [u, v]);
         };
         // Keep the collision grid, but draw a continuous wall/floor/window as rectangles.
@@ -172,6 +173,7 @@ export class VoxelGrid {
           b.nor.push(...face.n);
           b.uv.push(cu, cv);
           b.lay.push(lay);
+          b.em.push(t.emissive ?? 0);
           const a = AO_CURVE[ao[c]];
           b.col.push(tint.r * a, tint.g * a, tint.b * a);
         }
@@ -182,7 +184,7 @@ export class VoxelGrid {
     }
     const out = {};
     for (const b of buckets.values()) {
-      for (const { face, depth, lay, color, cells } of b.surfaces.values()) {
+      for (const { face, depth, lay, emissive, color, cells } of b.surfaces.values()) {
         const starts = [...cells.values()].sort((a, c) => a[1] - c[1] || a[0] - c[0]);
         for (const [u, v] of starts) {
           if (!cells.has(`${u},${v}`)) continue;
@@ -199,6 +201,7 @@ export class VoxelGrid {
             b.nor.push(...face.n);
             b.uv.push(cu * w, cv * h);
             b.lay.push(lay);
+            b.em.push(emissive);
             b.col.push(...color);
           }
           b.idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
@@ -210,6 +213,7 @@ export class VoxelGrid {
       geo.setAttribute('normal', new THREE.Float32BufferAttribute(b.nor, 3));
       geo.setAttribute('tileUv', new THREE.Float32BufferAttribute(b.uv, 2));
       geo.setAttribute('tileLayer', new THREE.Float32BufferAttribute(b.lay, 1));
+      geo.setAttribute('tileEmissive', new THREE.Float32BufferAttribute(b.em, 1));
       geo.setAttribute('color', new THREE.Float32BufferAttribute(b.col, 3));
       geo.setIndex(b.idx);
       geo.computeBoundingSphere();
