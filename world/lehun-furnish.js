@@ -47,6 +47,9 @@ const gameArt = canvasTexture(192, 108, (ctx, w, h) => {
 export function furnishLeHun({ B, walk, obstacles, bakes }) {
   const foot = (x, z, w, d, level = 1) => obstacles.push({
     x0: x - w / 2, x1: x + w / 2, z0: z - d / 2, z1: z + d / 2, level,
+    // LeHun floats above the water, so its semantic levels (0/1) do not
+    // match the absolute y values used by the navigation grid.
+    floor: level === 1 ? FLOOR : GROUND,
   });
   const bake = (id, x, y, z, power, radius, direction = null) => bakes.push({
     id, position: [x, y, z], power, radius, direction,

@@ -51,7 +51,10 @@ export function createNav(grid, obstacles) {
     for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
       const k = i + j * cols;
       const upper = floor[k] >= 2;
-      if ((o.level === 1) === upper) blocked[k] = 1;
+      const sameFloor = o.floor === undefined
+        ? (o.level === 1) === upper
+        : Math.abs(floor[k] - o.floor) < 0.25;
+      if (sameFloor) blocked[k] = 1;
     }
   }
   // Distance (in cells) to the nearest blocked cell, for route clearance.
