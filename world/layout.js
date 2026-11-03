@@ -27,8 +27,9 @@ export const inPool = (x, z) => {
   return true; // the ocean ring
 };
 export const SPAWN = { x: 0.5, z: 18, heading: Math.PI };
+export const PIANO = { x: -16.6, z: -0.1 };
 export const STATIONS = [
-  { id: 'piano', name: '钢琴', en: 'Piano', icon: 'works', at: [-19.75, 1.25], look: [-19.75, 0.05] },
+  { id: 'piano', name: '钢琴', en: 'Piano', icon: 'works', at: [PIANO.x, PIANO.z + 2.2], look: [PIANO.x, PIANO.z] },
   { id: 'mailbox', name: '留言', en: 'Mailbox', icon: 'mail', at: [0.5, 23.9], look: [0.5, 25.5] },
   { id: 'portal', name: '传送门', en: 'Portal', icon: 'portal', at: [8, 23.1], look: [8, 25.5] },
 ];

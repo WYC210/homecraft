@@ -5,6 +5,7 @@
 // lighting is baked, and each piece registers an obstacle for the nav.
 import * as THREE from 'three';
 import { canvasTexture } from '@engine/world/textures.js';
+import { PIANO } from './layout.js';
 
 const FLOOR = 1;
 
@@ -166,17 +167,9 @@ export function furnishGONGLU({ B, obstacles, bakes, surfaces, hotspots }) {
   planes.push(plane(0.88, 0.66, bedArt, -16.6, FLOOR + 1.9, 12.84, Math.PI));
   bake('bed-art', -16.6, FLOOR + 1.9, 12.6, 0.7, 3.5, [0, 0, -1]);
   B.box(-19.4, FLOOR + 0.01, 11.2, 1.8, 0.02, 2.4, L.rug);
-  // Wardrobe on the north wall, east of the TV console — the bed corner
-  // stays open and the east doorway keeps its approach.
-  B.box(-17, FLOOR, -0.65, 2.4, 2.3, 0.62, L.walnut);
-  B.box(-17, FLOOR + 1.15, -0.33, 0.02, 2.1, 0.03, L.dark);
-  for (const x of [-17.6, -16.4]) B.box(x, FLOOR + 1.1, -0.33, 0.04, 0.3, 0.04, L.steel);
-  B.box(-17, FLOOR + 2.34, -0.65, 2.2, 0.05, 0.55, L.glow(0xffe9c9));
-  bake('wardrobe', -17, FLOOR + 2.4, -0.4, 0.8, 4, [0, -1, 0.4]);
-  foot(-17, -0.65, 2.5, 0.8);
 
   // ——— Plants and door mats ———
-  for (const [x, z, s] of [[-27.5, 0.4, 1], [-14.8, 2.6, 0.85], [-19.9, 12.5, 0.75]]) {
+  for (const [x, z, s] of [[-27.5, 0.4, 1], [-19.9, 12.5, 0.75]]) {
     B.box(x, FLOOR, z, 0.3 * s, 0.34 * s, 0.3 * s, L.terra);
     B.box(x, FLOOR + 0.34 * s, z, 0.34 * s, 0.06, 0.34 * s, L.terra);
     B.box(x, FLOOR + 0.4 * s, z, 0.62 * s, 0.5 * s, 0.62 * s, L.leaf);
@@ -186,33 +179,135 @@ export function furnishGONGLU({ B, obstacles, bakes, surfaces, hotspots }) {
   B.box(-21.5, FLOOR + 0.005, 12.2, 1.8, 0.02, 0.9, L.mat);
   B.box(-14.9, FLOOR + 0.005, 5.9, 0.9, 0.02, 1.8, L.mat);
 
-  // A compact upright piano fills the open wall between the TV console and wardrobe.
-  const pianoX = -19.75, pianoZ = 0.05;
-  B.box(pianoX, FLOOR, pianoZ, 2.55, 0.24, 0.72, L.walnut);
-  B.box(pianoX, FLOOR + 0.24, pianoZ, 2.42, 1.05, 0.58, L.dark);
-  B.box(pianoX, FLOOR + 1.26, pianoZ, 2.58, 0.12, 0.7, L.walnut);
-  B.box(pianoX, FLOOR + 0.92, pianoZ + 0.29, 2.18, 0.42, 0.06, L.oak);
-  B.box(pianoX, FLOOR + 1.34, pianoZ + 0.28, 2.2, 0.08, 0.32, L.sheet);
-  const whiteKeyWidth = 2.06 / 14;
-  for (let i = 0; i < 14; i++) {
-    B.box(pianoX - 1.03 + whiteKeyWidth * (i + 0.5), FLOOR + 1.42, pianoZ + 0.31,
-      whiteKeyWidth - 0.012, 0.08, 0.34, L.sheet);
+  const pianoX = PIANO.x, pianoZ = PIANO.z;
+  const lacquer = { tex: 'paint', tint: 0x252b30 };
+  const panel = { tex: 'paint', tint: 0x353b40 };
+  const brass = { tex: 'paint', tint: 0xb39761 };
+  const ivory = { tex: 'paint', tint: 0xeee9da };
+  const ebony = { tex: 'paint', tint: 0x111619 };
+  const felt = { tex: 'paint', tint: 0x70352f };
+  B.box(pianoX, FLOOR + 0.004, pianoZ + 0.85, 3.75, 0.016, 2.7, { tex: 'linen', tint: 0x7f8975 });
+  B.box(pianoX, FLOOR + 0.02, pianoZ + 0.85, 3.53, 0.008, 2.48, { tex: 'linen', tint: 0xb8b4a4 });
+  B.at(pianoX, FLOOR, pianoZ, 0, () => {
+    B.box(0, 0.06, -0.08, 2.76, 0.12, 0.72, lacquer);
+    B.box(0, 0.18, -0.22, 2.62, 1.66, 0.48, lacquer);
+    B.box(0, 0.23, 0.035, 2.36, 0.47, 0.04, panel);
+    B.box(0, 0.26, 0.06, 2.18, 0.015, 0.012, brass);
+    for (const side of [-1, 1]) {
+      B.box(side * 1.33, 0.18, -0.1, 0.16, 1.68, 0.7, lacquer);
+      B.box(side * 1.255, 0.19, 0.36, 0.12, 0.55, 0.13, lacquer);
+      B.box(side * 1.255, 0.07, 0.24, 0.19, 0.12, 0.49, lacquer);
+      B.box(side * 1.31, 0.78, 0.3, 0.18, 0.21, 0.54, lacquer);
+      B.box(side * 1.31, 0.975, 0.3, 0.19, 0.025, 0.56, panel);
+      for (const depth of [-0.3, 0.37]) B.box(side * 1.255, 0, depth, 0.09, 0.07, 0.09, brass);
+    }
+    B.box(0, 1.06, 0.035, 2.46, 0.71, 0.045, panel);
+    for (const height of [1.075, 1.745]) B.box(0, height, 0.065, 2.37, 0.015, 0.012, brass);
+    B.box(0, 1.8, -0.1, 2.78, 0.06, 0.68, lacquer);
+    B.box(0, 1.855, -0.1, 2.8, 0.012, 0.7, brass);
+    B.box(0, 1.87, -0.1, 2.86, 0.07, 0.74, lacquer);
+    B.box(0, 0.735, 0.27, 2.8, 0.065, 0.63, lacquer);
+    B.box(0, 0.8, 0.28, 2.44, 0.02, 0.46, ebony);
+    B.box(0, 0.8, 0.575, 2.48, 0.025, 0.025, brass);
+    B.box(0, 0.91, 0.08, 2.44, 0.14, 0.07, lacquer);
+    B.box(0, 1.005, 0.119, 0.26, 0.025, 0.012, brass);
+    B.box(0, 0.86, 0.102, 2.4, 0.025, 0.02, felt);
+    const whiteKeyWidth = 2.4 / 52;
+    let whiteKeys = 0;
+    for (let midi = 21; midi <= 108; midi++) {
+      const pitch = midi % 12;
+      const isBlack = pitch === 1 || pitch === 3 || pitch === 6 || pitch === 8 || pitch === 10;
+      if (isBlack) {
+        B.box(-1.2 + whiteKeys * whiteKeyWidth, 0.865, 0.21,
+          whiteKeyWidth * 0.58, 0.045, 0.2, ebony);
+      } else {
+        B.box(-1.2 + (whiteKeys + 0.5) * whiteKeyWidth, 0.82, 0.3,
+          whiteKeyWidth - 0.003, 0.045, 0.36, ivory);
+        whiteKeys++;
+      }
+    }
+    B.box(0, 1.17, 0.12, 1.15, 0.53, 0.045, lacquer, { rx: -0.16 });
+    B.box(0, 1.165, 0.2, 1.2, 0.035, 0.16, lacquer);
+    B.box(0, 1.2, 0.282, 1.17, 0.012, 0.015, brass);
+    for (const side of [-1, 1]) {
+      B.box(side * 0.213, 1.225, 0.151, 0.416, 0.43, 0.009, ivory, { rx: -0.16 });
+      for (let system = 0; system < 2; system++) {
+        for (let staff = 0; staff < 5; staff++) {
+          const height = 1.29 + system * 0.18 + staff * 0.016;
+          B.box(side * 0.213, height, 0.16 - (height - 1.44) * Math.sin(0.16),
+            0.35, 0.003, 0.004, panel, { rx: -0.16 });
+        }
+        for (let note = 0; note < 5; note++) {
+          const noteX = side * 0.213 - 0.13 + note * 0.063;
+          const height = 1.306 + system * 0.18 + ((note * 3 + system) % 5) * 0.008;
+          B.box(noteX, height, 0.164 - (height - 1.44) * Math.sin(0.16),
+            0.018, 0.011, 0.006, ebony, { rx: -0.16 });
+          B.box(noteX + 0.007, height, 0.164 - (height + 0.02 - 1.44) * Math.sin(0.16),
+            0.003, 0.044, 0.006, ebony, { rx: -0.16 });
+        }
+      }
+    }
+    B.box(0, 0.13, 0.105, 0.58, 0.12, 0.055, lacquer);
+    for (const offset of [-0.18, 0, 0.18]) {
+      B.box(offset, 0.11, 0.3, 0.055, 0.035, 0.33, brass, { rx: -0.12 });
+      B.box(offset, 0.105, 0.455, 0.09, 0.035, 0.11, brass);
+    }
+    B.box(0, 1.94, -0.12, 0.29, 0.035, 0.2, brass);
+    B.box(0, 1.975, -0.18, 0.025, 0.2, 0.025, brass);
+    B.box(0, 2.15, -0.025, 0.025, 0.025, 0.33, brass);
+    B.box(0, 2.115, 0.12, 0.66, 0.065, 0.14, brass);
+    B.box(0, 2.108, 0.12, 0.57, 0.012, 0.11, L.glow(0xffe4ba, 0.8));
+  });
+  const benchZ = pianoZ + 1.3;
+  B.box(pianoX, FLOOR + 0.36, benchZ, 1.06, 0.06, 0.5, lacquer);
+  B.box(pianoX, FLOOR + 0.42, benchZ, 1.08, 0.08, 0.51, { tex: 'leather', tint: 0x35302d });
+  for (const dx of [-0.43, 0.43]) {
+    for (const dz of [-0.17, 0.17]) {
+      B.box(pianoX + dx, FLOOR + 0.035, benchZ + dz, 0.075, 0.325, 0.075, lacquer);
+      B.box(pianoX + dx, FLOOR, benchZ + dz, 0.08, 0.035, 0.08, brass);
+    }
+    for (const dz of [-0.12, 0.12]) B.box(pianoX + dx * 0.6, FLOOR + 0.499, benchZ + dz, 0.025, 0.003, 0.025, lacquer);
   }
-  for (const i of [0, 1, 3, 4, 5, 7, 8, 10, 11, 12]) {
-    B.box(pianoX - 1.03 + whiteKeyWidth * (i + 1), FLOOR + 1.5, pianoZ + 0.18,
-      whiteKeyWidth * 0.56, 0.16, 0.18, L.dark);
+  foot(pianoX, pianoZ + 0.05, 2.96, 1.12);
+  foot(pianoX, benchZ, 1.18, 0.61);
+  hotspot('piano', pianoX, FLOOR, pianoZ + 0.75, 2.96, 2.2, 2.3);
+  bake('piano-warmth', pianoX, FLOOR + 2.08, pianoZ + 0.22, 0.95, 4.5, [0, -1, 0.25]);
+
+  const lampX = pianoX - 2.05, lampZ = pianoZ + 0.3;
+  B.box(lampX, FLOOR, lampZ, 0.43, 0.05, 0.43, lacquer);
+  B.box(lampX, FLOOR + 0.05, lampZ, 0.035, 1.65, 0.035, brass);
+  B.box(lampX, FLOOR + 1.7, lampZ, 0.57, 0.28, 0.57, L.linen);
+  B.box(lampX, FLOOR + 1.688, lampZ, 0.45, 0.018, 0.45, L.glow(0xffe4ba, 0.8));
+  foot(lampX, lampZ, 0.55, 0.55);
+  bake('piano-corner-lamp', lampX, FLOOR + 1.68, lampZ, 1, 5.5, [0, -1, 0]);
+
+  B.box(pianoX, FLOOR + 2.47, -0.9, 1.74, 0.92, 0.065, L.walnut);
+  B.box(pianoX, FLOOR + 2.53, -0.86, 1.62, 0.8, 0.025, ivory);
+  for (let bar = 0; bar < 17; bar++) {
+    const height = 0.08 + 0.34 * Math.abs(Math.sin(bar * 0.65));
+    B.box(pianoX + (bar - 8) * 0.068, FLOOR + 2.92 - height / 2, -0.84,
+      0.025, height, 0.012, { tex: 'paint', tint: 0x516b59 });
   }
-  B.box(pianoX, FLOOR + 1.75, pianoZ + 0.02, 1.18, 0.06, 0.08, L.walnut, { rx: -0.22 });
-  B.box(pianoX, FLOOR + 1.69, pianoZ + 0.25, 1.18, 0.04, 0.04, L.steel);
-  for (const dx of [-0.62, 0.62]) B.box(pianoX + dx, FLOOR, pianoZ + 0.02, 0.1, 1.1, 0.1, L.dark);
-  for (const dx of [-0.22, 0.22]) B.box(pianoX + dx, FLOOR, pianoZ + 0.39, 0.06, 0.06, 0.22, L.steel, { rx: -0.2 });
-  const benchZ = 1.12;
-  B.box(pianoX, FLOOR + 0.42, benchZ, 0.95, 0.12, 0.42, L.linen);
-  for (const dx of [-0.36, 0.36]) B.box(pianoX + dx, FLOOR, benchZ, 0.08, 0.42, 0.08, L.dark);
-  foot(pianoX, pianoZ, 2.65, 0.82);
-  foot(pianoX, benchZ, 1.0, 0.5);
-  hotspot('piano', pianoX, FLOOR, 0.75, 2.8, 1.9, 2.2);
-  bake('piano-warmth', pianoX, FLOOR + 1.6, pianoZ + 0.3, 0.65, 4.5, [0, -1, 0.2]);
+  B.box(pianoX + 0.57, FLOOR + 3.13, -0.84, 0.11, 0.11, 0.012, brass);
+
+  const plantX = -14.7, plantZ = 0.75;
+  B.at(plantX, FLOOR, plantZ, 0, () => {
+    B.box(0, 0, 0, 0.37, 0.42, 0.37, L.terra);
+    B.box(0, 0.39, 0, 0.42, 0.06, 0.42, L.terra);
+    B.box(0, 0.45, 0, 0.32, 0.015, 0.32, L.mat);
+    B.box(0, 0.46, 0, 0.055, 1.1, 0.055, L.walnut);
+    for (const [height, yaw] of [[0.8, 0.3], [1.02, 2.4], [1.25, 4.2], [1.46, 1.4]]) {
+      B.at(0, height, 0, yaw, () => {
+        B.box(0, 0, 0.12, 0.025, 0.025, 0.27, L.walnut, { rx: -0.3 });
+        for (let band = 0; band < 5; band++) {
+          B.box(0, 0.06 + band * 0.025, 0.1 + band * 0.075,
+            [0.12, 0.24, 0.3, 0.23, 0.11][band], 0.035, 0.08,
+            { tex: 'leaves_olive', tint: 0x78906a });
+        }
+      });
+    }
+  });
+  foot(plantX, plantZ, 0.55, 0.55);
 
   return planes;
 }

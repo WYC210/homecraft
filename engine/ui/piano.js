@@ -2,6 +2,8 @@
 // It uses the browser's Web Audio API so the world does not need a second app
 // bundle or a remote audio service just to let visitors play a few notes.
 
+import { pianoMusic } from './piano-music.js';
+
 const WHITE_NOTE_NAMES = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
 const WHITE_KEYS = Array.from({ length: 24 }, (_, index) => ({
   note: `${WHITE_NOTE_NAMES[index % 7]}${3 + Math.floor(index / 7)}`,
@@ -119,12 +121,17 @@ function normalizeBundledSong(data, artist) {
       continue;
     }
     if (voice.type !== 'beat' || !voice.notes?.length) continue;
-    const beats = Math.max(0.125, 4 / (Number(voice.duration) || 4)) * (voice.dot ? 1.5 : 1);
-    const repeat = Math.max(1, Number(voice.beatCount) || 1);
-    for (let i = 0; i < repeat; i++) {
-      const note = voice.notes[0];
-      bar.push([bundledLabel(note), bundledNote(note.tone, note.octave, data.key, note.accidentalMode), beats]);
-    }
+    const duration = Math.max(1, Number(voice.duration) || 4);
+    const dots = Math.max(0, Math.min(2, Number(voice.dot) || 0));
+    const count = Math.max(1, Number(voice.beatCount) || 1);
+    const beats = Math.max(0.125, 4 / duration) * count * (2 - Math.pow(2, -dots));
+    const note = voice.notes[0];
+    bar.push([
+      bundledLabel(note),
+      bundledNote(note.tone, note.octave, data.key, note.accidentalMode),
+      beats,
+      { octave: note.octave || 0, duration, dots, lyrics: voice.lyrics?.join('') || '', tie: !!voice.tieStart },
+    ]);
   }
   if (bar.length) bars.push(bar);
   return {
@@ -132,6 +139,9 @@ function normalizeBundledSong(data, artist) {
     title: data.title || artist,
     en: artist,
     bpm: Math.max(40, Math.round(Number(data.tempo) || 80)),
+    key: data.key || 'C',
+    meter: data.timeSignature?.map(time => `${time.numerator}/${time.denominator}`).join(' · ') || '4/4',
+    subtitle: data.subTitle || artist,
     bars,
   };
 }
@@ -157,8 +167,21 @@ export function createPiano(body) {
       <button class="piano-button" type="button" data-piano-play>播放</button>
       <button class="piano-button secondary" type="button" data-piano-stop>停止</button>
     </div>
-    <div class="piano-meta"><span data-piano-title></span><span data-piano-tempo></span></div>
-    <div class="piano-score" data-piano-score aria-label="简谱"></div>
+    <div class="piano-background-controls">
+      <label class="piano-background-toggle"><input type="checkbox" data-piano-background>背景音乐 · 自动循环</label>
+      <label class="piano-volume-label">音量 <input type="range" min="0" max="100" step="5" data-piano-volume aria-label="背景音乐音量"></label>
+      <small>默认关闭；开启后，关闭面板或离开钢琴仍会继续播放。</small>
+    </div>
+    <div class="piano-meta"><span>数字简谱</span><span data-piano-position></span></div>
+    <div class="piano-score" data-piano-score tabindex="0" role="region" aria-label="简谱，可滚动查看">
+      <div class="piano-sheet-header">
+        <h3 data-piano-title></h3>
+        <p data-piano-subtitle></p>
+        <div class="piano-sheet-meta"><span data-piano-signature></span><span data-piano-tempo></span></div>
+      </div>
+      <div class="piano-staves" data-piano-staves></div>
+      <p class="piano-score-end" aria-hidden="true">— 终 —</p>
+    </div>
     <div class="piano-keyboard" data-piano-keyboard aria-label="钢琴键盘"></div>
     <p class="piano-practice-status" data-piano-practice-status aria-live="polite"></p>
     <p class="piano-help">点击琴键演奏，电脑端可按琴键上方提示的按键。</p>
@@ -168,7 +191,13 @@ export function createPiano(body) {
   const playButton = root.querySelector('[data-piano-play]');
   const practiceButton = root.querySelector('[data-piano-practice]');
   const stopButton = root.querySelector('[data-piano-stop]');
+  const backgroundInput = root.querySelector('[data-piano-background]');
+  const volumeInput = root.querySelector('[data-piano-volume]');
   const titleEl = root.querySelector('[data-piano-title]');
+  const subtitleEl = root.querySelector('[data-piano-subtitle]');
+  const signatureEl = root.querySelector('[data-piano-signature]');
+  const positionEl = root.querySelector('[data-piano-position]');
+  const stavesEl = root.querySelector('[data-piano-staves]');
   const tempoEl = root.querySelector('[data-piano-tempo]');
   const scoreEl = root.querySelector('[data-piano-score]');
   const keyboardEl = root.querySelector('[data-piano-keyboard]');
@@ -180,12 +209,15 @@ export function createPiano(body) {
   const pressed = new Set();
   let audio = null;
   let songs = SONGS;
-  let selected = songs[0];
+  let selected = pianoMusic.state.song || songs[0];
   let playing = false;
   let playIndex = -1;
-  let playRun = 0;
+  let disposed = false;
+  let playbackNote = null;
   let practiceMode = false;
   let practiceIndex = 0;
+  let scoreNotes = [];
+  let highlightedNote = null;
 
   const renderSongOptions = () => {
     select.replaceChildren();
@@ -245,7 +277,7 @@ export function createPiano(body) {
   const startVoice = async note => {
     if (!note) return null;
     const context = await getAudio();
-    if (!context) return null;
+    if (!context || disposed) return null;
     const now = context.currentTime;
     const oscillator = context.createOscillator();
     const gain = context.createGain();
@@ -281,77 +313,156 @@ export function createPiano(body) {
     });
   };
 
+  const notationFor = ([jian, note, beats = 1, notation = {}]) => ({
+    octave: notation.octave ?? (note ? Number(note.at(-1)) - 4 : 0),
+    beams: Math.max(0, Math.min(3, Math.round(Math.log2((notation.duration || 4 / Math.min(1, beats)) / 4)))),
+    dashes: Math.max(0, Math.floor(beats) - 1),
+    dots: notation.dots || 0,
+    lyrics: notation.lyrics || '',
+    tie: notation.tie || false,
+    accidental: jian.startsWith('#') ? '♯' : jian.startsWith('b') ? '♭' : '',
+    numeral: jian.replace(/^[#b]/, ''),
+  });
+
   const scoreLines = () => {
     const mobile = window.matchMedia('(max-width: 600px)').matches;
-    const available = Math.max(240, (scoreEl.clientWidth || (mobile ? window.innerWidth - 52 : window.innerWidth - 100)) - (mobile ? 12 : 32));
-    const noteWidth = mobile ? 22 : 30;
-    const noteGap = mobile ? 2 : 5;
+    const available = stavesEl.clientWidth || Math.max(200, window.innerWidth - (mobile ? 64 : 120));
+    const slot = mobile ? 24 : 32;
     const lines = [];
     let line = [];
     let lineWidth = 0;
-    for (const bar of selected.bars) {
-      const noteCount = Math.max(1, bar.length);
-      const width = Math.max(42, noteCount * noteWidth + (noteCount - 1) * noteGap + 18);
-      if (line.length && lineWidth + width > available) {
+    selected.bars.forEach((bar, measure) => {
+      const units = bar.reduce((sum, item) => sum + 1 + notationFor(item).dashes, 0);
+      const width = units * slot + (mobile ? 16 : 24);
+      if (line.length && (lineWidth + width > available || line.length === 4)) {
         lines.push(line);
         line = [];
         lineWidth = 0;
       }
-      line.push(bar);
+      line.push({ bar, measure, units });
       lineWidth += width;
-    }
+    });
     if (line.length) lines.push(line);
-    while (lines.length < 3) lines.push([]);
     return lines;
   };
 
+  const scoreNote = (data, index) => {
+    const [jian, note, beats = 1] = data;
+    const notation = notationFor(data);
+    const item = document.createElement('span');
+    item.className = 'piano-note';
+    item.dataset.index = index;
+    item.dataset.note = note || '';
+    item.style.flexGrow = String(1 + notation.dashes);
+    item.setAttribute('aria-label', `${jian}，${beats}拍${notation.lyrics ? `，${notation.lyrics}` : ''}`);
+    const event = document.createElement('span');
+    event.className = 'piano-event';
+    const tone = document.createElement('span');
+    tone.className = 'piano-tone';
+    const high = document.createElement('span');
+    high.className = 'piano-octave high';
+    high.textContent = note && notation.octave > 0 ? '•'.repeat(notation.octave) : '';
+    const number = document.createElement('span');
+    number.className = 'piano-number';
+    if (notation.accidental) {
+      const accidental = document.createElement('small');
+      accidental.className = 'piano-accidental';
+      accidental.textContent = notation.accidental;
+      number.append(accidental);
+    }
+    const glyph = document.createElement('span');
+    glyph.className = 'piano-numeral';
+    glyph.textContent = notation.numeral;
+    number.append(glyph);
+    if (notation.dots) {
+      const dots = document.createElement('small');
+      dots.className = 'piano-augmentation';
+      dots.textContent = '·'.repeat(notation.dots);
+      number.append(dots);
+    }
+    const rhythm = document.createElement('span');
+    rhythm.className = 'piano-rhythm';
+    for (let beam = 0; beam < notation.beams; beam++) rhythm.append(document.createElement('i'));
+    const low = document.createElement('span');
+    low.className = 'piano-octave low';
+    low.textContent = note && notation.octave < 0 ? '•'.repeat(-notation.octave) : '';
+    tone.append(high, number, rhythm, low);
+    event.append(tone);
+    for (let dash = 0; dash < notation.dashes; dash++) {
+      const sustain = document.createElement('span');
+      sustain.className = 'piano-sustain';
+      sustain.textContent = '−';
+      event.append(sustain);
+    }
+    const lyrics = document.createElement('span');
+    lyrics.className = 'piano-lyrics';
+    lyrics.textContent = notation.lyrics;
+    const cursor = document.createElement('i');
+    cursor.className = 'piano-cursor';
+    cursor.setAttribute('aria-hidden', 'true');
+    tone.append(cursor);
+    item.append(event, lyrics);
+    if (notation.tie) {
+      const tie = document.createElement('i');
+      tie.className = 'piano-tie';
+      tie.setAttribute('aria-hidden', 'true');
+      item.append(tie);
+    }
+    return item;
+  };
+
   const renderScore = () => {
-    titleEl.textContent = `${selected.title} / ${selected.en}`;
-    tempoEl.textContent = `${selected.bpm} BPM`;
-    scoreEl.replaceChildren();
+    titleEl.textContent = selected.title;
+    subtitleEl.textContent = selected.subtitle || selected.en;
+    signatureEl.textContent = `1 = ${(selected.key || 'C').replace('b', '♭').replace('#', '♯')}    ${selected.meter || '4/4'}`;
+    tempoEl.textContent = `♩ = ${selected.bpm}`;
+    stavesEl.replaceChildren();
+    scoreNotes = [];
     let index = 0;
     for (const bars of scoreLines()) {
       const line = document.createElement('div');
       line.className = 'piano-score-line';
-      bars.forEach((bar, barIndex) => {
+      for (const { bar, measure: measureIndex, units } of bars) {
         const measure = document.createElement('div');
         measure.className = 'piano-measure';
-        measure.dataset.count = String(bar.length);
-        measure.style.flexGrow = String(Math.max(1, bar.length));
-        for (const [jian, note, beats = 1] of bar) {
-          const item = document.createElement('span');
-          item.className = 'piano-note';
-          item.dataset.index = index++;
-          item.dataset.note = note || '';
-          item.textContent = jian;
-          if (beats > 1) item.classList.add('long');
-          const cursor = document.createElement('i');
-          cursor.className = 'piano-cursor';
-          cursor.setAttribute('aria-hidden', 'true');
-          item.append(cursor);
+        measure.dataset.measure = measureIndex + 1;
+        measure.style.flexGrow = String(units);
+        if (bar.some(item => notationFor(item).lyrics)) line.classList.add('has-lyrics');
+        const count = document.createElement('span');
+        count.className = 'piano-measure-number';
+        count.textContent = String(measureIndex + 1).padStart(2, '0');
+        count.setAttribute('aria-hidden', 'true');
+        measure.append(count);
+        for (const data of bar) {
+          const item = scoreNote(data, index++);
+          scoreNotes.push(item);
           measure.append(item);
         }
         line.append(measure);
-        if (barIndex < bars.length - 1) {
-          const divider = document.createElement('span');
-          divider.className = 'piano-divider';
-          divider.textContent = '|';
-          line.append(divider);
-        }
-      });
-      scoreEl.append(line);
+      }
+      stavesEl.append(line);
     }
-    highlightScore(practiceMode ? practiceIndex : playing ? Math.max(0, playIndex - 1) : 0);
+    scoreEl.scrollTop = 0;
+    highlightScore(practiceMode ? practiceIndex : playing ? playIndex : -1);
   };
 
   const flatten = () => selected.bars.flatMap(bar => bar.map(([jian, note, beats = 1]) => ({ jian, note, beats })));
   const highlightScore = index => {
-    const notes = scoreEl.querySelectorAll('.piano-note');
-    notes.forEach((el, i) => {
-      el.classList.toggle('active', i === index);
-      el.classList.toggle('cursor', i === index);
-    });
-    if (index >= 0) notes[index]?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    if (highlightedNote) {
+      highlightedNote.classList.remove('active', 'cursor');
+      highlightedNote.removeAttribute('aria-current');
+    }
+    highlightedNote = scoreNotes[index] || null;
+    positionEl.textContent = `共 ${selected.bars.length} 小节`;
+    if (!highlightedNote) return;
+    highlightedNote.classList.add('active', 'cursor');
+    highlightedNote.setAttribute('aria-current', 'true');
+    const line = highlightedNote.closest('.piano-score-line');
+    const bounds = scoreEl.getBoundingClientRect();
+    const row = line.getBoundingClientRect();
+    if (row.top < bounds.top + 12) scoreEl.scrollTop += row.top - bounds.top - 12;
+    else if (row.bottom > bounds.bottom - 12) scoreEl.scrollTop += row.bottom - bounds.bottom + 12;
+    positionEl.textContent = `第 ${highlightedNote.closest('.piano-measure').dataset.measure} 小节 / 共 ${selected.bars.length} 小节`;
   };
 
   const syncPracticeTarget = () => {
@@ -383,52 +494,45 @@ export function createPiano(body) {
   };
 
   const stopSong = () => {
-    playRun++;
-    playing = false;
-    playIndex = -1;
+    pianoMusic.stop();
     timers.forEach(timer => clearTimeout(timer));
     timers.clear();
     voices.forEach(stopVoice);
-    highlightScore(practiceMode ? practiceIndex : 0);
-    playButton.textContent = '播放';
+    highlightScore(practiceMode ? practiceIndex : -1);
   };
 
-  const advanceSong = run => {
-    if (!playing || run !== playRun) return;
-    const notes = flatten();
-    if (playIndex >= notes.length) { stopSong(); return; }
-    const index = playIndex++;
-    const item = notes[index];
-    const duration = (60000 / selected.bpm) * item.beats;
-    highlightScore(index);
-    startVoice(item.note).then(voice => {
-      if (!voice) return;
-      if (!playing || run !== playRun) { stopVoice(voice); return; }
-      const release = setTimeout(() => { timers.delete(release); stopVoice(voice); }, Math.max(120, duration * 0.86));
-      timers.add(release);
-    });
-    const next = setTimeout(() => { timers.delete(next); advanceSong(run); }, duration);
-    timers.add(next);
-  };
-
-  const playSong = () => {
-    if (practiceMode) return;
-    stopSong();
-    playing = true;
-    playIndex = 0;
-    playButton.textContent = '暂停';
-    advanceSong(playRun);
+  const syncPlayback = state => {
+    if (playbackNote) setActive(playbackNote, false);
+    playbackNote = state.song?.id === selected.id ? state.note : null;
+    if (playbackNote) setActive(playbackNote, true);
+    playing = state.playing && state.song?.id === selected.id;
+    playIndex = state.index;
+    backgroundInput.checked = state.background;
+    volumeInput.value = String(Math.round(state.volume * 100));
+    playButton.textContent = playing ? '暂停' : '播放';
+    if (!practiceMode) {
+      highlightScore(playing ? playIndex : -1);
+      practiceStatusEl.textContent = state.error;
+    }
   };
 
   const onSelect = () => {
+    const background = pianoMusic.state.background;
     stopSong();
     selected = songs.find(song => song.id === select.value) || songs[0];
     practiceIndex = 0;
     renderScore();
     if (practiceMode) syncPracticeTarget();
+    else if (background) void pianoMusic.setBackground(true, selected);
   };
-  const onPlay = () => playing ? stopSong() : playSong();
+  const onPlay = () => { if (playing) pianoMusic.pause(); else void pianoMusic.play(selected); };
   const onStop = () => stopSong();
+  const onBackground = () => {
+    const enabled = backgroundInput.checked;
+    if (practiceMode) onPractice();
+    void pianoMusic.setBackground(enabled, selected);
+  };
+  const onVolume = () => pianoMusic.setVolume(Number(volumeInput.value) / 100);
   const onPractice = () => {
     if (practiceMode) {
       practiceMode = false;
@@ -486,6 +590,8 @@ export function createPiano(body) {
   playButton.addEventListener('click', onPlay);
   practiceButton.addEventListener('click', onPractice);
   stopButton.addEventListener('click', onStop);
+  backgroundInput.addEventListener('change', onBackground);
+  volumeInput.addEventListener('input', onVolume);
   window.addEventListener('keydown', onKeyDown);
   window.addEventListener('keyup', onKeyUp);
   let lastScoreWidth = 0;
@@ -497,6 +603,7 @@ export function createPiano(body) {
   window.addEventListener('resize', onResize);
   renderSongOptions();
   renderScore();
+  const unsubscribe = pianoMusic.subscribe(syncPlayback);
   requestAnimationFrame(onResize);
 
   void Promise.all(BUNDLED_SONG_SOURCES.map(async source => {
@@ -504,24 +611,35 @@ export function createPiano(body) {
     if (!response.ok) throw new Error(`Unable to load ${source.url}`);
     return normalizeBundledSong(await response.json(), source.artist);
   })).then(loaded => {
-    if (!loaded.length || !loaded.some(song => song.bars.length)) return;
-    stopSong();
+    if (disposed || !loaded.length || !loaded.some(song => song.bars.length)) return;
+    const backgroundSong = pianoMusic.state.background && pianoMusic.state.song;
+    if (!backgroundSong) stopSong();
     songs = loaded;
-    selected = songs[0];
+    selected = songs.find(song => song.id === backgroundSong?.id) || songs[0];
     practiceIndex = 0;
     renderSongOptions();
     renderScore();
     if (practiceMode) syncPracticeTarget();
+    else syncPlayback(pianoMusic.state);
   }).catch(() => {
     // The small fallback songs keep the piano usable if a static asset is missing.
   });
 
   return () => {
-    stopSong();
+    disposed = true;
+    unsubscribe();
+    if (!pianoMusic.state.background) pianoMusic.stop();
+    timers.forEach(timer => clearTimeout(timer));
+    timers.clear();
     window.removeEventListener('keydown', onKeyDown);
     window.removeEventListener('keyup', onKeyUp);
     window.removeEventListener('resize', onResize);
     practiceButton.removeEventListener('click', onPractice);
+    select.removeEventListener('change', onSelect);
+    playButton.removeEventListener('click', onPlay);
+    stopButton.removeEventListener('click', onStop);
+    backgroundInput.removeEventListener('change', onBackground);
+    volumeInput.removeEventListener('input', onVolume);
     voices.forEach(stopVoice);
     if (audio) { void audio.close(); audio = null; }
   };
