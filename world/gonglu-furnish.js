@@ -1,6 +1,6 @@
 // Interior of the giant crafting-table tower: a warm little home in the
 // example-home manner — living room around a TV wall, a sofa, a study desk
-// against the built-in bookshelf wall and a bed in the south-east corner.
+// along the west wall and a bed in the south-east corner.
 // Everything rides the tower's `model` BoxBatch (no extra draw calls); all
 // lighting is baked, and each piece registers an obstacle for the nav.
 import * as THREE from 'three';
@@ -123,50 +123,101 @@ export function furnishGONGLU({ B, obstacles, bakes, surfaces, hotspots }) {
     bake('pendant' + i, x, FLOOR + 3.4, 1.5, 3.2, 10, [0, -1, 0]);
   }
 
-  // ——— Study nook: desk against the built-in bookshelf wall ———
-  B.box(-26.5, FLOOR + 0.7, 10.35, 0.95, 0.07, 1.9, L.oak);
-  for (const z of [9.55, 11.15]) B.box(-26.5, FLOOR, z, 0.7, 0.7, 0.08, L.steel);
-  B.box(-26.45, FLOOR + 0.12, 11.02, 0.24, 0.46, 0.46, L.dark);
-  B.box(-26.4, FLOOR + 0.79, 10.05, 0.34, 0.24, 0.2, L.dark, { ry: 0.3 });
-  B.box(-26.35, FLOOR + 0.78, 10.4, 0.44, 0.025, 0.16, L.dark);
-  B.box(-26.3, FLOOR + 0.78, 10.72, 0.08, 0.02, 0.12, L.steel);
-  foot(-26.5, 10.35, 1.1, 2.0);
-  for (const [i, z] of [10.02, 10.68].entries()) {
-    B.box(-26.82, FLOOR + 0.83, z, 0.1, 0.3, 0.06, L.steel);
-    B.box(-26.82, FLOOR + 1.1, z, 0.14, 0.05, 0.1, L.dark);
-    planes.push(plane(0.76, 0.46, monitorArt, -26.74, FLOOR + 1.38, z, Math.PI / 2));
-    if (i === 0) bake('desk-screen', -26.6, FLOOR + 1.4, z, 0.5, 3, [0.6, -0.2, 0]);
-  }
-  B.box(-26.78, FLOOR + 0.77, 9.55, 0.1, 0.3, 0.1, L.walnut);
-  B.box(-26.78, FLOOR + 1.04, 9.55, 0.16, 0.14, 0.16, L.glow(0xffe4ba, 0.8));
-  bake('desk-lamp', -26.7, FLOOR + 1.1, 10.3, 0.9, 4.5, [0, -1, 0.3]);
-  bake('bookshelf-wash', -26.9, FLOOR + 2.3, 10.35, 0.9, 4.5, [-0.6, -0.4, 0]);
-  ergonomicChair(B, -25.45, 10.35, Math.PI / 2);
-  foot(-25.45, 10.35, 0.85, 0.85);
+  const deskX = -27.32, deskZ = 9.8;
+  B.box(-26.5, FLOOR + 0.004, deskZ, 2.85, 0.016, 3.65, L.rug);
+  B.box(-26.5, FLOOR + 0.02, deskZ, 2.65, 0.006, 3.45, { tex: 'linen', tint: 0xc0b7a4 });
+  B.at(deskX, FLOOR, deskZ, Math.PI / 2, () => {
+    B.box(0, 0.72, 0, 2.8, 0.06, 0.84, L.oak);
+    B.box(0, 0.68, -0.32, 2.6, 0.04, 0.06, L.dark);
+    for (const side of [-1, 1]) {
+      for (const depth of [-0.32, 0.32]) B.box(side * 1.27, 0.04, depth, 0.055, 0.68, 0.055, L.dark);
+      B.box(side * 1.27, 0.025, 0, 0.12, 0.035, 0.76, L.dark);
+    }
+    B.box(1.01, 0.12, -0.02, 0.43, 0.52, 0.62, L.walnut);
+    for (const height of [0.15, 0.4]) {
+      B.box(1.01, height, 0.301, 0.38, 0.21, 0.018, L.oak);
+      B.box(1.01, height + 0.14, 0.317, 0.1, 0.016, 0.014, L.dark);
+    }
+    B.box(-1.04, 0.1, -0.04, 0.31, 0.51, 0.52, L.dark);
+    B.box(-1.04, 0.14, 0.224, 0.25, 0.41, 0.016, { tex: 'paint', tint: 0x3b4143 });
+    for (const height of [0.22, 0.38]) {
+      B.box(-1.04, height, 0.235, 0.13, 0.11, 0.008, L.steel);
+      B.box(-1.04, height + 0.025, 0.24, 0.05, 0.06, 0.008, L.dark);
+    }
+    B.box(-0.95, 0.56, 0.237, 0.02, 0.02, 0.01, L.glow(0x9ab8a5, 0.4));
+    B.box(0, 0.782, 0.14, 1.45, 0.008, 0.42, { tex: 'leather', tint: 0x41483f });
+    B.box(0.15, 0.792, 0.17, 0.62, 0.025, 0.2, L.dark);
+    for (let row = 0; row < 3; row++) {
+      for (let key = 0; key < 11; key++) B.box(-0.11 + key * 0.05, 0.817, 0.11 + row * 0.05, 0.039, 0.008, 0.036, { tex: 'paint', tint: 0xb5bab0 });
+    }
+    B.box(-0.44, 0.792, 0.19, 0.09, 0.035, 0.14, L.dark);
+    for (const offset of [-0.47, 0.47]) {
+      B.box(offset, 0.78, -0.24, 0.28, 0.025, 0.2, L.dark);
+      B.box(offset, 0.805, -0.26, 0.045, 0.29, 0.045, L.steel);
+      B.box(offset, 1.075, -0.235, 0.93, 0.55, 0.055, L.dark);
+      B.box(offset + 0.38, 1.087, -0.202, 0.015, 0.009, 0.006, L.glow(0xa9c7aa, 0.4));
+    }
+    B.box(1.13, 0.78, -0.18, 0.22, 0.025, 0.22, L.dark);
+    B.box(1.13, 0.805, -0.18, 0.025, 0.67, 0.025, L.dark);
+    B.box(1.13, 1.46, 0, 0.025, 0.025, 0.38, L.dark);
+    B.box(1.13, 1.415, 0.16, 0.3, 0.07, 0.12, L.walnut);
+    B.box(1.13, 1.405, 0.16, 0.25, 0.012, 0.1, L.glow(0xffe4ba, 0.8));
+    B.box(-1.15, 0.78, -0.23, 0.16, 0.15, 0.16, L.terra);
+    B.box(-1.15, 0.93, -0.23, 0.2, 0.14, 0.18, L.leaf);
+  });
+  for (const offset of [-0.47, 0.47]) planes.push(plane(0.87, 0.49, monitorArt, deskX - 0.204, FLOOR + 1.36, deskZ - offset, Math.PI / 2));
+  bake('desk-screen', deskX + 0.05, FLOOR + 1.3, deskZ, 0.5, 3, [0.7, -0.2, 0]);
+  bake('desk-lamp', deskX + 0.16, FLOOR + 1.4, deskZ - 1.13, 0.9, 4, [0, -1, 0]);
+  foot(deskX, deskZ, 0.94, 2.9);
+  ergonomicChair(B, -26.08, deskZ, Math.PI / 2);
+  foot(-26.08, deskZ, 0.9, 0.9);
 
-  // ——— Bedroom corner: bed against the south wall ———
-  B.box(-16.6, FLOOR, 12.78, 2.1, 1.05, 0.14, L.walnut);
-  B.box(-16.6, FLOOR + 0.6, 12.74, 1.7, 0.4, 0.06, L.sage(0x6e7f5e));
-  B.box(-16.6, FLOOR, 11.3, 2.0, 0.3, 3.2, L.walnut);
-  B.box(-16.6, FLOOR + 0.3, 11.25, 1.9, 0.28, 3.0, L.linen);
-  B.box(-16.6, FLOOR + 0.58, 10.85, 1.9, 0.14, 2.15, L.sheet);
-  for (const dx of [-0.48, 0.48]) B.box(-16.6 + dx, FLOOR + 0.58, 12.32, 0.86, 0.14, 0.5, { tex: 'paint', tint: 0xe4e0d6 });
-  foot(-16.6, 11.3, 2.2, 3.4);
-  for (const x of [-17.95, -15.25]) {
-    B.box(x, FLOOR, 12.5, 0.55, 0.42, 0.5, L.oak);
-    B.box(x, FLOOR + 0.42, 12.5, 0.6, 0.05, 0.55, L.walnut);
-    B.box(x, FLOOR + 0.47, 12.5, 0.07, 0.22, 0.07, L.walnut);
-    B.box(x, FLOOR + 0.66, 12.5, 0.18, 0.16, 0.18, L.glow(0xffe4ba, 0.8));
-    foot(x, 12.5, 0.65, 0.6);
-    bake('bedside' + (x < -16.6 ? '-w' : '-e'), x, FLOOR + 0.72, 12.4, 0.7, 3.5);
+  const bedX = -17.1, bedZ = 11.4;
+  const bedding = { tex: 'linen', tint: 0xe5dfd0 };
+  const accent = { tex: 'linen', tint: 0x73816d };
+  B.box(bedX, FLOOR + 0.004, 10.55, 4.4, 0.016, 4.4, L.rug);
+  B.box(bedX, FLOOR + 0.02, 10.55, 4.16, 0.008, 4.16, { tex: 'linen', tint: 0xc6bfad });
+  B.box(bedX, FLOOR + 0.04, 12.72, 2.25, 1.12, 0.16, L.walnut);
+  for (const offset of [-0.51, 0.51]) B.box(bedX + offset, FLOOR + 0.44, 12.617, 0.99, 0.63, 0.075, accent);
+  for (const offsetX of [-0.85, 0.85]) {
+    for (const offsetZ of [-0.94, 0.94]) B.box(bedX + offsetX, FLOOR + 0.03, bedZ + offsetZ, 0.09, 0.17, 0.09, L.walnut);
   }
-  B.box(-16.6, FLOOR, 9.25, 1.6, 0.1, 0.45, { tex: 'paint', tint: 0x1f2224 });
-  for (const dx of [-0.65, 0.65]) B.box(-16.6 + dx, FLOOR, 9.25, 0.07, 0.34, 0.4, L.steel);
-  foot(-16.6, 9.25, 1.75, 0.6);
-  B.box(-16.6, FLOOR + 1.9, 12.88, 1.0, 0.76, 0.06, L.walnut);
-  planes.push(plane(0.88, 0.66, bedArt, -16.6, FLOOR + 1.9, 12.84, Math.PI));
-  bake('bed-art', -16.6, FLOOR + 1.9, 12.6, 0.7, 3.5, [0, 0, -1]);
-  B.box(-19.4, FLOOR + 0.01, 11.2, 1.8, 0.02, 2.4, L.rug);
+  B.box(bedX, FLOOR + 0.16, bedZ, 2.1, 0.18, 2.4, L.walnut);
+  B.box(bedX, FLOOR + 0.34, bedZ, 1.98, 0.18, 2.28, L.linen);
+  B.box(bedX, FLOOR + 0.52, 11.08, 1.99, 0.09, 1.66, bedding);
+  for (const offset of [-0.98, 0.98]) B.box(bedX + offset, FLOOR + 0.4, 11.04, 0.045, 0.2, 1.72, bedding);
+  for (const offset of [-0.49, 0.49]) {
+    B.box(bedX + offset, FLOOR + 0.52, 12.18, 0.88, 0.14, 0.49, bedding);
+    B.box(bedX + offset, FLOOR + 0.6, 12.36, 0.7, 0.2, 0.16, L.linen, { rx: -0.16 });
+  }
+  B.box(bedX, FLOOR + 0.611, 10.62, 2.02, 0.035, 0.53, accent);
+  for (const offset of [-0.99, 0.99]) B.box(bedX + offset, FLOOR + 0.35, 10.62, 0.045, 0.26, 0.53, accent);
+  foot(bedX, 11.5, 2.23, 2.65);
+  for (const side of [-1, 1]) {
+    const nightstandX = bedX + side * 1.5;
+    for (const offset of [-0.2, 0.2]) B.box(nightstandX + offset, FLOOR + 0.03, 12.28, 0.045, 0.15, 0.42, L.dark);
+    B.box(nightstandX, FLOOR + 0.18, 12.28, 0.57, 0.3, 0.48, L.walnut);
+    B.box(nightstandX, FLOOR + 0.48, 12.28, 0.63, 0.04, 0.54, L.oak);
+    B.box(nightstandX, FLOOR + 0.22, 12.031, 0.49, 0.21, 0.02, L.oak);
+    B.box(nightstandX, FLOOR + 0.36, 12.014, 0.12, 0.015, 0.018, L.dark);
+    B.box(nightstandX, FLOOR + 0.52, 12.32, 0.19, 0.025, 0.19, L.walnut);
+    B.box(nightstandX, FLOOR + 0.545, 12.32, 0.025, 0.22, 0.025, L.steel);
+    B.box(nightstandX, FLOOR + 0.75, 12.32, 0.32, 0.23, 0.28, L.linen);
+    B.box(nightstandX, FLOOR + 0.738, 12.32, 0.26, 0.015, 0.22, L.glow(0xffe4ba, 0.8));
+    foot(nightstandX, 12.28, 0.73, 0.64);
+    bake('bedside' + (side < 0 ? '-w' : '-e'), nightstandX, FLOOR + 0.73, 12.28, 0.85, 4, [0, -1, -0.2]);
+  }
+  const bedBenchZ = 8.65;
+  for (const offsetX of [-0.65, 0.65]) {
+    for (const offsetZ of [-0.16, 0.16]) B.box(bedX + offsetX, FLOOR + 0.03, bedBenchZ + offsetZ, 0.055, 0.34, 0.055, L.dark);
+  }
+  B.box(bedX, FLOOR + 0.34, bedBenchZ, 1.6, 0.05, 0.46, L.walnut);
+  B.box(bedX, FLOOR + 0.39, bedBenchZ, 1.63, 0.09, 0.48, { tex: 'linen', tint: 0x555f53 });
+  B.box(bedX + 0.47, FLOOR + 0.48, bedBenchZ, 0.33, 0.025, 0.49, bedding);
+  foot(bedX, bedBenchZ, 1.73, 0.58);
+  B.box(bedX, FLOOR + 1.7, 12.88, 1.45, 0.9, 0.06, L.walnut);
+  planes.push(plane(1.3, 0.75, bedArt, bedX, FLOOR + 2.15, 12.84, Math.PI));
+  bake('bed-art', bedX, FLOOR + 2.7, 12.6, 0.6, 3.5, [0, -0.5, -1]);
 
   // ——— Plants and door mats ———
   for (const [x, z, s] of [[-27.5, 0.4, 1], [-19.9, 12.5, 0.75]]) {

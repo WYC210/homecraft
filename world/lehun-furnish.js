@@ -1,8 +1,4 @@
-// Interior of the LeHun cottage. The pink lounge now occupies the larger
-// blue-and-yellow upper hall, with a clear stair approach and a TV-centered
-// layout. Furniture stays in the shared model batch and all lighting is baked.
-import * as THREE from 'three';
-import { canvasTexture } from '@engine/world/textures.js';
+import { buildTradingStudio } from './lehun-trading.js';
 
 const GROUND = 12;
 const FLOOR = 19;
@@ -28,21 +24,6 @@ const L = {
   gymGraphite: { tex: 'paint', tint: 0x707a7d, emissive: 0.14 },
   glow: (tint, emissive = 1) => ({ tex: 'paint', tint, emissive }),
 };
-
-const gameArt = canvasTexture(192, 108, (ctx, w, h) => {
-  ctx.fillStyle = '#2b2333';
-  ctx.fillRect(0, 0, w, h);
-  for (let i = 0; i < 40; i++) {
-    ctx.fillStyle = ['#f2afc0', '#e4e4e4', '#8fb7d8', '#e3b0a4'][i % 4];
-    ctx.fillRect((i * 37) % (w - 12) + 6, (i * 23) % (h - 30) + 20, 6, 6);
-  }
-  ctx.fillStyle = '#f2afc0';
-  ctx.fillRect(0, h - 26, w, 4);
-  ctx.fillRect(w - 58, h - 22, 50, 12);
-  ctx.fillStyle = '#2b2333';
-  ctx.font = '10px monospace';
-  ctx.fillText('LEHUN QUEST', w - 52, h - 13);
-});
 
 export function furnishLeHun({ B, walk, obstacles, bakes }) {
   const foot = (x, z, w, d, level = 1) => obstacles.push({
@@ -132,15 +113,7 @@ export function furnishLeHun({ B, walk, obstacles, bakes }) {
     bake('gym-ceiling-' + i, x, GROUND + 6.7, z, 5.0, 11, [0, -1, 0]);
   }
 
-  // A large pink inlay leaves a one-block blue/yellow border around the new
-  // room, so the old small pink area reads as having moved instead of doubled.
-  // Split the slab around the east stair opening instead of burying the
-  // staircase inside a solid upper-floor box.
-  B.box(12.25, FLOOR - 0.04, 43.0, 5.5, 0.08, 12, L.pinkFloor);
-  for (const [x, z, w, d] of [
-    [13.5, 38.08, 8, 0.16], [13.5, 48.92, 8, 0.16],
-    [9.08, 43.5, 0.16, 10.7], [17.92, 43.5, 0.16, 10.7],
-  ]) B.box(x, FLOOR + 0.01, z, w, 0.02, d, L.pinkDeep);
+  B.box(12.25, FLOOR - 0.04, 43.0, 5.5, 0.08, 12, { tex: 'wood_floor', tint: 0xd3c9b4, emissive: 0.18 });
   for (let x = ROOM.x0; x < ROOM.x1; x++) for (let z = ROOM.z0; z < ROOM.z1; z++) {
     if (x >= 15) continue;
     tread(x, z, FLOOR);
@@ -163,100 +136,14 @@ export function furnishLeHun({ B, walk, obstacles, bakes }) {
     tread(x, 36, FLOOR);
   }
 
-  // Rails frame the high floor while leaving the stair landing and TV wall
-  // open. The railing uses the same cherry/pink family as the transferred room.
-  B.box(12.0, FLOOR, 49.42, 5.5, 0.82, 0.12, L.cherry);
-  B.box(12.0, FLOOR + 0.82, 49.42, 5.5, 0.06, 0.16, L.pink);
-  B.box(17.0, FLOOR, 49.42, 1, 0.82, 0.12, L.cherry);
-  B.box(17.0, FLOOR + 0.82, 49.42, 1, 0.06, 0.16, L.pink);
-  B.box(17.42, FLOOR, 43.5, 0.12, 0.82, 10.7, L.cherry);
-  B.box(17.42, FLOOR + 0.82, 43.5, 0.16, 0.06, 10.7, L.pink);
+  B.box(12.0, FLOOR, 49.42, 5.5, 0.82, 0.12, { tex: 'wood_panel', tint: 0xc5b499 });
+  B.box(12.0, FLOOR + 0.82, 49.42, 5.5, 0.06, 0.16, { tex: 'paint', tint: 0x303a3d });
+  B.box(17.0, FLOOR, 49.42, 1, 0.82, 0.12, { tex: 'wood_panel', tint: 0xc5b499 });
+  B.box(17.0, FLOOR + 0.82, 49.42, 1, 0.06, 0.16, { tex: 'paint', tint: 0x303a3d });
+  B.box(17.42, FLOOR, 43.5, 0.12, 0.82, 10.7, { tex: 'wood_panel', tint: 0xc5b499 });
+  B.box(17.42, FLOOR + 0.82, 43.5, 0.16, 0.06, 10.7, { tex: 'paint', tint: 0x303a3d });
 
-  // The main piece is a wide media wall on the north side of the room.
-  B.box(12.0, FLOOR, 37.35, 3.8, 0.5, 0.62, L.cherry);
-  B.box(12.0, FLOOR + 0.5, 37.35, 4, 0.06, 0.7, L.white);
-  B.box(13.3, FLOOR + 0.56, 37.35, 0.36, 0.1, 0.26, L.graphite);
-  B.box(10.55, FLOOR + 0.56, 37.35, 0.16, 0.06, 0.12, L.pinkDeep);
-  B.box(12.0, FLOOR + 1.04, 37.02, 3.45, 1.85, 0.07, L.graphite);
-  const tv = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 1.8), new THREE.MeshBasicMaterial({
-    map: gameArt,
-    side: THREE.FrontSide,
-    transparent: false,
-    depthTest: true,
-    depthWrite: true,
-  }));
-  // The screen faces the room and sits just in front of its frame. Normal
-  // depth testing keeps it hidden when viewed through the outside wall.
-  tv.position.set(12.0, FLOOR + 1.98, 37.1);
-  // PlaneGeometry's front face already points toward the room at this wall.
-  tv.rotation.y = 0;
-  planes.push(tv);
-  foot(12.0, 37.35, 4.2, 0.85);
-  bake('lounge-tv', 12.0, FLOOR + 2.05, 37.65, 3.0, 8, [0, -1, 0.4]);
-
-  // Sofa, coffee table and a generous rug leave a clear approach from the
-  // stairs and keep the TV sightline centered in the larger floor area.
-  B.box(12.5, FLOOR + 0.01, 43.15, 4.8, 0.02, 4.1, { tex: 'linen', tint: 0xf6d7dc });
-  B.box(12.5, FLOOR + 0.1, 45.0, 3.8, 0.4, 1.05, L.graphite);
-  B.box(12.5, FLOOR + 0.48, 45.42, 3.8, 0.62, 0.22, L.graphite);
-  for (const x of [10.8, 14.2]) B.box(x, FLOOR + 0.1, 45.0, 0.3, 0.62, 1.05, L.graphite);
-  B.box(12.5, FLOOR + 0.42, 42.0, 1.5, 0.08, 0.82, { tex: 'prada_marble' });
-  for (const [x, z] of [[11.9, 41.7], [13.1, 41.7], [11.9, 42.3], [13.1, 42.3]]) {
-    B.box(x, FLOOR + 0.02, z, 0.05, 0.4, 0.05, L.steel);
-  }
-  B.box(12.15, FLOOR + 0.49, 41.92, 0.24, 0.05, 0.17, L.pinkDeep);
-  B.box(12.85, FLOOR + 0.49, 42.08, 0.17, 0.045, 0.12, L.white);
-  foot(12.5, 45.0, 4.1, 1.3);
-  foot(12.5, 42.0, 1.6, 0.9);
-
-  // West side: a compact training nook moved out of the old cramped room.
-  B.box(10.65, FLOOR + 0.05, 43.0, 1.1, 0.18, 2.15, L.frame);
-  B.box(10.65, FLOOR + 0.23, 43.05, 0.82, 0.035, 1.78, L.graphite);
-  for (const x of [10.12, 11.18]) {
-    B.box(x, FLOOR + 0.22, 42.18, 0.075, 1.05, 0.075, L.frame);
-    B.box(x, FLOOR + 1.1, 42.4, 0.075, 0.06, 0.55, L.graphite);
-  }
-  B.box(10.65, FLOOR + 1.15, 42.18, 1.02, 0.32, 0.18, L.graphite, { rx: -0.2 });
-  B.box(10.65, FLOOR + 1.24, 42.28, 0.35, 0.15, 0.025, L.pinkDeep);
-  foot(10.65, 43.0, 1.2, 2.3);
-  B.box(10.65, FLOOR + 0.01, 46.25, 1.2, 0.02, 1.65, L.pink);
-  B.box(12.25, FLOOR + 0.01, 46.25, 1.2, 0.02, 1.65, L.cream);
-  B.box(11.45, FLOOR, 47.05, 1.0, 0.4, 0.35, L.cherry);
-  B.box(11.45, FLOOR + 0.4, 47.05, 1.1, 0.05, 0.42, L.white);
-  foot(11.45, 47.05, 1.2, 0.5);
-
-  // East side storage and a plant balance the media wall without narrowing
-  // the route between the staircase, sofa and south rail.
-  B.box(10.25, FLOOR, 39.5, 0.9, 1.4, 0.62, L.cherry);
-  B.box(10.25, FLOOR + 1.4, 39.5, 1.0, 0.06, 0.7, L.white);
-  for (const z of [39.2, 39.8]) B.box(10.25, FLOOR + 0.75, z, 0.12, 0.12, 0.12, L.pinkDeep);
-  foot(10.25, 39.5, 1.05, 0.85);
-  B.box(16.0, FLOOR, 46.5, 0.3, 0.34, 0.3, L.terra);
-  B.box(16.0, FLOOR + 0.4, 46.5, 0.62, 0.5, 0.62, L.leaf);
-  B.box(16.0, FLOOR + 0.82, 46.5, 0.4, 0.3, 0.4, L.leaf);
-  foot(16.0, 46.5, 0.5, 0.5);
-
-  // Warm points keep the large room legible at night without real-time lights.
-  for (const x of [10, 12.5, 15, 16.8]) B.box(x, FLOOR + 1.02, 49.34, 0.09, 0.09, 0.09, L.glow(0xffd9e0));
-  bake('lounge-string', 13.5, FLOOR + 1.1, 49.0, 3.0, 10, [0, -0.6, -0.2]);
-  bake('lounge-warm', 13.5, FLOOR + 3.0, 43.0, 4.2, 10, [0, -1, 0]);
-  // Two pendants make the main light source visible, like the well-lit
-  // lounge in gonglu. Their long stems meet the original ceiling without
-  // occupying the clear stair approach.
-  for (const [i, x] of [11.5, 13.5].entries()) {
-    B.box(x, FLOOR + 3.55, 43.0, 0.04, 4.8, 0.04, L.steel);
-    B.box(x, FLOOR + 3.5, 43.0, 0.5, 0.09, 0.5, L.steel);
-    B.box(x, FLOOR + 3.47, 43.0, 0.36, 0.03, 0.36, L.glow(0xffe4ba));
-    bake('lounge-pendant-' + i, x, FLOOR + 3.4, 43.0, 5.0, 12, [0, -1, 0]);
-  }
-  // A warm line above the TV fills the media wall without washing out the
-  // screen itself, while the four small ceiling points cover the corners.
-  B.box(12.0, FLOOR + 3.02, 37.0, 2.8, 0.05, 0.06, L.glow(0xffd9a0));
-  bake('lounge-tv-wash', 12.0, FLOOR + 2.95, 37.2, 3.0, 8, [0, -0.7, 0.7]);
-  for (const [i, [x, z]] of [[0, [10.0, 40.5]], [1, [15.5, 40.5]], [2, [10.0, 47.0]], [3, [15.5, 47.0]]]) {
-    B.box(x, FLOOR + 2.76, z, 0.22, 0.08, 0.22, L.glow(0xffe0ad));
-    bake('lounge-ceiling-' + i, x, FLOOR + 2.72, z, 4.5, 10, [0, -1, 0]);
-  }
+  planes.push(buildTradingStudio({ B, foot, bake, floor: FLOOR }));
 
   return planes;
 }

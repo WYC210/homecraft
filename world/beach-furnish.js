@@ -1,7 +1,7 @@
 // Small beach details that make the open sand read as a lived-in shoreline.
 // Everything stays in the shared model batch so the decoration costs no extra
 // draw call beyond the existing furniture group.
-import { PORTAL } from './layout.js';
+import { PORTAL, IKUN_ENTRY } from './layout.js';
 
 const OAK = { tex: 'oak' };
 const WALNUT = { tex: 'walnut' };
@@ -270,8 +270,8 @@ export function furnishBeach({ B, obstacles, bakes }) {
     pathStone(0.5 + (Math.random() - 0.5) * 0.4, z);
   }
   // Branch to IKUN (east)
-  for (let x = 2; x <= 8; x += 1.6) {
-    pathStone(x, -4 + (Math.random() - 0.5) * 0.3);
+  for (let step = 0; step <= 4; step++) {
+    pathStone(2 + (IKUN_ENTRY.x - 2) * step / 4, IKUN_ENTRY.z + (Math.random() - 0.5) * 0.3);
   }
   // Branch to crafting tower (west)
   for (let x = -2; x >= -20; x -= 1.8) {

@@ -4,6 +4,7 @@
 import * as L from '@world/layout.js';
 
 const ISLAND = L.ISLAND, STATIONS = L.STATIONS || [], POOL = L.POOL || null, HOUSE = L.HOUSE || null;
+const inPool = L.inPool ?? (POOL ? (x, z) => x >= POOL.x0 && x < POOL.x1 && z >= POOL.z0 && z < POOL.z1 : () => false);
 import { icon } from './icons.js';
 import { nameOf } from '../lang.js';
 
@@ -22,11 +23,12 @@ export function drawMapImage(grid, obstacles, decorate = null) {
   const canvas = document.createElement('canvas');
   canvas.width = w; canvas.height = h;
   const ctx = canvas.getContext('2d');
+  const roofGroup = grid.groupNames.indexOf('roof');
   const top = (x, z) => {
-    for (let y = 8; y >= -4; y--) {
+    for (let y = grid.min[1] + grid.size[1] - 1; y >= grid.min[1]; y--) {
       const t = grid.type(x, y, z);
       if (!t) continue;
-      if (grid.groups[grid.index(x, y, z)] === grid.groupNames.indexOf('roof')) continue;
+      if (grid.groups[grid.index(x, y, z)] === roofGroup) continue;
       return { t, y };
     }
     return null;
@@ -38,12 +40,12 @@ export function drawMapImage(grid, obstacles, decorate = null) {
   };
   for (let x = ISLAND.x0; x < ISLAND.x1; x++) for (let z = ISLAND.z0; z < ISLAND.z1; z++) {
     const here = top(x, z);
-    if (!here) continue;
+    const pool = !!POOL && inPool(x + 0.5, z + 0.5) && (!here || here.y + 1 <= POOL.water);
+    if (!here && !pool) continue;
     const north = top(x, z - 1);
     let k = 1;
-    if (north && north.y < here.y) k = 1.1;
-    if (north && north.y > here.y) k = 0.84;
-    const pool = !!POOL && x >= POOL.x0 && x < POOL.x1 && z >= POOL.z0 && z < POOL.z1;
+    if (!pool && north && north.y < here.y) k = 1.1;
+    if (!pool && north && north.y > here.y) k = 0.84;
     // A block type can bring its own map colour: grid.define('x', { map: '#hex', ... }).
     ctx.fillStyle = shade(pool ? COLORS.pool_deep : here.t.map || COLORS[here.t.name] || '#888888', k);
     ctx.fillRect((x - ISLAND.x0) * PPM, (z - ISLAND.z0) * PPM, PPM, PPM);

@@ -208,8 +208,9 @@ export function createPiano(body) {
   const timers = new Set();
   const pressed = new Set();
   let audio = null;
-  let songs = SONGS;
-  let selected = pianoMusic.state.song || songs[0];
+  const currentSong = pianoMusic.state.song;
+  let songs = currentSong && !SONGS.some(song => song.id === currentSong.id) ? [currentSong, ...SONGS] : SONGS;
+  let selected = currentSong || songs[0];
   let playing = false;
   let playIndex = -1;
   let disposed = false;
@@ -614,7 +615,7 @@ export function createPiano(body) {
     if (disposed || !loaded.length || !loaded.some(song => song.bars.length)) return;
     const backgroundSong = pianoMusic.state.background && pianoMusic.state.song;
     if (!backgroundSong) stopSong();
-    songs = loaded;
+    songs = backgroundSong && !loaded.some(song => song.id === backgroundSong.id) ? [backgroundSong, ...loaded] : loaded;
     selected = songs.find(song => song.id === backgroundSong?.id) || songs[0];
     practiceIndex = 0;
     renderSongOptions();

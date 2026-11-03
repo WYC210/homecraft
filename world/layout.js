@@ -1,4 +1,5 @@
 import { blockGONGLU } from './gonglu-model.js';
+import { IKUN_SIZE, IKUN_SCALE } from './ikun-model.js';
 
 // 1 block = 1 m. x east, z south, y up.
 // ISLAND covers the sand island AND the swimming bay south of it (the grid
@@ -57,12 +58,12 @@ export const PETS = {
   },
 };
 
-// The IKUN cottage from a litematic, east of the spawn lawn: its ground-level
-// entrance ramp starts at z = -6 and the raised floor (model layer 4) is the
-// room at world x ∈ [11, 17), z ∈ [-1, 7), four metres up. The model sits one
-// metre low (y = -1) because the world grid tops out at y = 14 — at y = 0 the
-// model's top layer would land exactly on the excluded row and vanish.
 export const MODEL_ORIGIN = { x: 4, y: -1, z: -6 };
+export const IKUN_CENTER = {
+  x: MODEL_ORIGIN.x + IKUN_SIZE[0] * IKUN_SCALE[0] / 2,
+  z: MODEL_ORIGIN.z + IKUN_SIZE[2] * IKUN_SCALE[2] / 2,
+};
+export const IKUN_ENTRY = { x: IKUN_CENTER.x, z: MODEL_ORIGIN.z + IKUN_SIZE[2] * IKUN_SCALE[2] + 0.65 };
 // The LeHun cottage from a litematic, hovering over the swimming bay: 18
 // wide centred on the bay (x -9..8), base four metres above the water (the
 // grid tops out at y = 27, so 4 is the highest the 24-layer model can sit).
@@ -74,7 +75,9 @@ export const ORIGIN_GONGLU = { x: -36, y: 0, z: -16 };
 // The Cinnamoroll ferris wheel, rotated to face the beach, on the east lawn.
 export const ORIGIN_FERRIS = { x: 18, y: 0, z: -14 };
 export function floorAt(x, z) {
-  if (x >= 5 && x < 11 && z >= -1 && z < 7) return 4;
+  const ikunX = 2 * IKUN_CENTER.x - x - MODEL_ORIGIN.x;
+  const ikunZ = 2 * IKUN_CENTER.z - z - MODEL_ORIGIN.z;
+  if (ikunX >= 1 && ikunX < 7 && ikunZ >= 5 && ikunZ < 13) return MODEL_ORIGIN.y + 5;
   // The LeHun hall floor and its doorway threshold — nav cell centres sit on
   // .25/.75, so the ranges must cover them (the west strip mx=1 was missed).
   if (x >= 2 && x < 17 && z >= 36 && z < 50) return 12;
@@ -95,4 +98,4 @@ export function floorAt(x, z) {
 // The baked lamp light covers both litematic cottages (min corner, size in
 // metres, texels). The LeHun loft reaches y=27, so the volume must include
 // its ceiling fixtures as well as the lower gym.
-export const LIGHT_VOLUME = { min: [-30, -1, -16], extent: [68, 30, 50], size: [68, 30, 50] };
+export const LIGHT_VOLUME = { min: [-30, -1, -16], extent: [68, 30, 70], size: [68, 30, 70] };

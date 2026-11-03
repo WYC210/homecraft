@@ -98,6 +98,7 @@ try {
     const wrongBounds = await wrongKey.boundingBox();
     await wrongKey.click({ position: { x: wrongBounds.width / 2, y: wrongBounds.height * 0.85 } });
     assert.equal(await page.locator('.piano-note.active').getAttribute('data-index'), before, 'A wrong practice note advanced the score');
+    const panelScrollBefore = await page.locator('#panel .body').evaluate(panel => panel.scrollTop);
     await page.evaluate(() => {
       for (let step = 0; step < 45; step++) {
         const target = document.querySelector('.piano-note.active');
@@ -110,7 +111,7 @@ try {
     await assertCursorClear(page);
     const scroll = await page.evaluate(() => ({ sheet: document.querySelector('.piano-score').scrollTop, panel: document.querySelector('#panel .body').scrollTop, window: scrollY }));
     assert.ok(scroll.sheet > 0, 'Following the music did not scroll the score');
-    assert.equal(scroll.panel, 0, 'Following the music moved the outer panel');
+    assert.equal(scroll.panel, panelScrollBefore, 'Following the music moved the outer panel');
     assert.equal(scroll.window, 0, 'Following the music moved the page');
     await page.screenshot({ path: fileURLToPath(new URL(`piano-sheet-practice-${view.name}.png`, out)) });
     const current = await page.locator('.piano-note.active').getAttribute('data-index');
@@ -157,6 +158,114 @@ try {
   await page.evaluate(() => window.disposePiano());
   await context.close();
   console.log('Upper/lower octaves, accidentals, sustained notes and unavailable-asset fallback passed');
+  const musicContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  await musicContext.addInitScript(() => {
+    window.pianoAudioCount = 0;
+    window.pianoOscillatorCount = 0;
+    const NativeAudioContext = window.AudioContext;
+    window.AudioContext = new Proxy(NativeAudioContext, {
+      construct(target, args) {
+        window.pianoAudioCount++;
+        const audio = Reflect.construct(target, args);
+        const createOscillator = audio.createOscillator.bind(audio);
+        audio.createOscillator = () => { window.pianoOscillatorCount++; return createOscillator(); };
+        return audio;
+      },
+    });
+  });
+  const musicPage = await musicContext.newPage();
+  const musicErrors = [];
+  musicPage.on('pageerror', error => musicErrors.push(error.message));
+  await musicPage.route('**/__piano-check', route => route.fulfill({ contentType: 'text/html', body: fixture }));
+  await musicPage.goto(new URL('/__piano-check', base).href);
+  await musicPage.waitForFunction(() => document.querySelector('[data-piano-song] option')?.value.startsWith('bundled-'));
+  const musicState = () => musicPage.evaluate(async () => (await import('/engine/ui/piano-music.js')).pianoMusic.state);
+  const remount = () => musicPage.evaluate(async () => {
+    const { createPiano } = await import('/engine/ui/piano.js');
+    document.querySelector('#panel').open = true;
+    window.disposePiano = createPiano(document.querySelector('#panel .body'));
+    return { selected: document.querySelector('[data-piano-song]').value, background: document.querySelector('[data-piano-background]').checked };
+  });
+  const dispose = () => musicPage.evaluate(() => {
+    window.disposePiano();
+    document.querySelector('#panel').open = false;
+  });
+  assert.equal((await musicState()).background, false);
+  assert.equal((await musicState()).playing, false);
+  assert.equal(await musicPage.evaluate(() => window.pianoAudioCount), 0, 'Opening a piano must not create audio or autoplay');
+  await musicPage.locator('[data-piano-play]').click();
+  await musicPage.waitForFunction(async () => (await import('/engine/ui/piano-music.js')).pianoMusic.state.playing);
+  await dispose();
+  assert.equal((await musicState()).playing, false, 'Ordinary playback survived closing the piano');
+  const oscillatorsBefore = await musicPage.evaluate(() => window.pianoOscillatorCount);
+  await musicPage.keyboard.press('a');
+  assert.equal(await musicPage.evaluate(() => window.pianoOscillatorCount), oscillatorsBefore, 'Disposed keyboard handlers still played notes');
+  await remount();
+  await musicPage.waitForFunction(() => document.querySelector('[data-piano-song] option')?.value.startsWith('bundled-'));
+  await musicPage.locator('[data-piano-background]').check();
+  const backgroundSongId = (await musicState()).song.id;
+  await musicPage.locator('[data-piano-volume]').evaluate(input => {
+    input.value = '35';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  assert.equal((await musicState()).volume, 0.35);
+  await dispose();
+  await musicPage.waitForFunction(async () => (await import('/engine/ui/piano-music.js')).pianoMusic.state.index > 0);
+  assert.equal((await musicState()).background, true);
+  assert.equal((await musicState()).playing, true, 'Background music stopped when the piano closed');
+  assert.equal(await musicPage.locator('.piano-music').count(), 1);
+  await musicPage.locator('[data-music-pause]').click();
+  assert.equal((await musicState()).playing, false);
+  assert.equal((await musicState()).background, true);
+  await musicPage.locator('[data-music-pause]').click();
+  assert.equal((await musicState()).playing, true);
+  assert.deepEqual(await remount(), { selected: backgroundSongId, background: true }, 'Reopening the piano lost the current background song');
+  await musicPage.waitForTimeout(250);
+  assert.equal(await musicPage.locator('[data-piano-song]').inputValue(), backgroundSongId);
+  assert.equal(await musicPage.locator('[data-piano-volume]').inputValue(), '35');
+  assert.equal(await musicPage.evaluate(() => window.pianoAudioCount), 1, 'Reopening created a duplicate player');
+  const otherSongId = await musicPage.locator('[data-piano-song] option').evaluateAll(options => options.find(option => option.value !== document.querySelector('[data-piano-song]').value).value);
+  await musicPage.selectOption('[data-piano-song]', otherSongId);
+  assert.equal((await musicState()).song.id, otherSongId);
+  assert.equal((await musicState()).background, true);
+  await musicPage.locator('[data-piano-practice]').click();
+  assert.equal((await musicState()).background, false, 'Practice did not stop background music');
+  assert.equal((await musicState()).playing, false);
+  await dispose();
+  await musicPage.evaluate(async () => {
+    const { pianoMusic } = await import('/engine/ui/piano-music.js');
+    window.pianoLoopStarts = 0;
+    window.unsubscribeLoop = pianoMusic.subscribe(state => {
+      if (state.playing && state.index === 0) window.pianoLoopStarts++;
+    });
+    await pianoMusic.setBackground(true, { id: 'loop-check', title: 'Loop', en: 'Loop', bpm: 600, bars: [[['1', 'C4', 0.25], ['2', 'D4', 0.25]]] });
+  });
+  await musicPage.waitForFunction(() => window.pianoLoopStarts >= 3);
+  assert.equal((await musicState()).playing, true);
+  await musicPage.locator('[data-music-off]').click();
+  assert.equal((await musicState()).background, false);
+  assert.equal((await musicState()).playing, false);
+  await musicPage.evaluate(() => window.unsubscribeLoop());
+  await musicPage.route('**/assets/piano/*.json', async route => {
+    await new Promise(resolve => setTimeout(resolve, 900));
+    await route.fulfill({ json: notation });
+  });
+  await musicPage.reload();
+  await musicPage.waitForFunction(() => document.querySelector('[data-piano-song]')?.value === 'star');
+  assert.equal((await musicState()).background, false, 'Refreshing re-enabled background music');
+  assert.equal(await musicPage.evaluate(() => window.pianoAudioCount), 0);
+  await musicPage.locator('[data-piano-background]').check();
+  await musicPage.waitForFunction(() => document.querySelector('[data-piano-song] option[value^="bundled-"]'));
+  assert.equal(await musicPage.locator('[data-piano-song]').inputValue(), 'star', 'Loading bundled songs replaced an active fallback song');
+  assert.equal((await musicState()).song.id, 'star');
+  await dispose();
+  assert.deepEqual(await remount(), { selected: 'star', background: true });
+  await musicPage.locator('[data-piano-stop]').click();
+  assert.equal((await musicState()).background, false);
+  await dispose();
+  assert.deepEqual(musicErrors, []);
+  await musicContext.close();
+  console.log('Background music: default off, disposal, keyboard cleanup, persistence, reopen, volume, song changes, practice, loop, global controls, refresh and delayed assets passed');
 } finally {
   await browser.close();
 }

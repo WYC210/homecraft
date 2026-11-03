@@ -1,7 +1,7 @@
 import { BoxBatch } from '@engine/world/blocks.js';
 import { buildIsland } from '@engine/world/terrain.js';
 import { buildForest, buildTufts } from '@engine/world/landscape.js';
-import { ISLAND, LAND, BAY, TREES, MODEL_ORIGIN, LEHUN_ORIGIN, ORIGIN_GONGLU, ORIGIN_FERRIS } from './layout.js';
+import { ISLAND, LAND, BAY, TREES, MODEL_ORIGIN, IKUN_CENTER, IKUN_ENTRY, LEHUN_ORIGIN, ORIGIN_GONGLU, ORIGIN_FERRIS } from './layout.js';
 import { buildLitematicIKUN } from './ikun-model.js';
 import { buildLitematicLEHUN } from './lehun-model.js';
 import { buildLitematicGONGLU } from './gonglu-model.js';
@@ -123,15 +123,29 @@ export function build({ grid, layer, materials, stage }) {
       B.box(cx, wy + 0.72, cz + 0.05, 0.65, 0.1, 0.65, LOOKS.terra);
     }
   };
-  buildLitematicIKUN(grid, MODEL_ORIGIN, mapIKUN, () => 'model',
+  const ikunWalkStart = walk.length, ikunBakeStart = bakes.length;
+  const ikunGrid = {
+    set(x, y, z, type) {
+      grid.set(2 * IKUN_CENTER.x - x - 1, y, 2 * IKUN_CENTER.z - z - 1, type);
+    },
+  };
+  B.at(IKUN_CENTER.x, 0, IKUN_CENTER.z, Math.PI, () => B.at(-IKUN_CENTER.x, 0, -IKUN_CENTER.z, 0, () => {
+    buildLitematicIKUN(ikunGrid, MODEL_ORIGIN, mapIKUN, () => 'model',
     (name, props, wx, wy, wz) => {
       const mx = wx - MODEL_ORIGIN.x, my = wy - MODEL_ORIGIN.y, mz = wz - MODEL_ORIGIN.z;
+      if (name === 'minecraft:black_wall_banner' && my === 12 && mz === 15) {
+        B.box(wx + 0.5, wy, wz + 0.5, 0.14, 1, 0.14, LOOKS.rod);
+        B.box(wx + 0.5, wy + 0.35, wz + 0.7, 0.72, 0.5, 0.06, LOOKS.black);
+        bakes.push({ id: 'ikun-eye-stem-' + mx, position: [wx + 0.5, wy + 0.5, wz + 0.5], power: 3, radius: 7, direction: null });
+        return;
+      }
       // The chicken's white eye rods were stored on the side of the head
       // (x=1/6, z=8). Move each pair onto the front face and rotate to face south.
       if (name === 'minecraft:end_rod' && (mx === 1 || mx === 6) &&
           (my === 6 || my === 7) && mz === 8) {
+        if (my === 6) return;
         const eyeX = mx === 1 ? 2 : 5;
-        emitShape(name, { ...props, facing: 'south' }, MODEL_ORIGIN.x + eyeX, wy, MODEL_ORIGIN.z + 13, kindIKUN(name, eyeX, 13));
+        emitShape(name, { ...props, facing: 'south' }, MODEL_ORIGIN.x + eyeX, wy, MODEL_ORIGIN.z + 13, 'rod', LOOKS.rod);
         return;
       }
       // The mouth stripe (mz=6) also needs to move to the front face, rotated to face south.
@@ -141,6 +155,7 @@ export function build({ grid, layer, materials, stage }) {
       }
       emitShape(name, props, wx, wy, wz, kindIKUN(name, mx, mz));
     });
+  }));
   // IKUN sits apart from the wheel, so use a compact five-point fill rather
   // than a real-time light. The sources cover the face, side panels and feet
   // while staying inside the existing baked LIGHT_VOLUME.
@@ -159,6 +174,20 @@ export function build({ grid, layer, materials, stage }) {
     { id: 'ikun-eye-left', position: [MODEL_ORIGIN.x + 2.5, 7, MODEL_ORIGIN.z + 14], power: 3, radius: 4, direction: null },
     { id: 'ikun-eye-right', position: [MODEL_ORIGIN.x + 5.5, 7, MODEL_ORIGIN.z + 14], power: 3, radius: 4, direction: null },
   );
+  for (let index = ikunWalkStart; index < walk.length; index++) {
+    const tread = walk[index];
+    tread[0] = 2 * IKUN_CENTER.x - tread[0] - 1;
+    tread[1] = 2 * IKUN_CENTER.z - tread[1] - 1;
+  }
+  for (let index = ikunBakeStart; index < bakes.length; index++) {
+    const source = bakes[index];
+    source.position[0] = 2 * IKUN_CENTER.x - source.position[0];
+    source.position[2] = 2 * IKUN_CENTER.z - source.position[2];
+    if (source.direction) {
+      source.direction[0] *= -1;
+      source.direction[2] *= -1;
+    }
+  }
   buildLitematicLEHUN(grid, LEHUN_ORIGIN, mapLeHun, () => 'model', (name, props, wx, wy, wz) => {
     const mx = wx - 1, my = wy - 4, mz = wz - 34;
     // Match mapLeHun's upper-room cleanup for non-block shapes as well. The
@@ -270,7 +299,7 @@ export function build({ grid, layer, materials, stage }) {
     surfaces,
     planes,
     forest,
-    sites: [toys, makeModelSite(walk)],
+    sites: [toys, makeModelSite(walk, obstacles)],
   };
 }
 
@@ -392,15 +421,10 @@ function kindLeHun(name) {
 // (the companion furnace tower occupies the rest of the model volume).
 function mapGONGLU(name, props = {}, mx, my, mz) {
   if (name === 'minecraft:air' || mx < 7 || mx > 22 || mz < 14 || mz > 30) return null;
-  // Interior furniture and small flora stay out; bookshelves keep — they are
-  // part of the tower face pattern.
   if (/chest|barrel|hopper|_bed$|^minecraft:water|jukebox|ender_chest|crafting_table|furnace|smoker|stonecutter|smithing_table|enchanting_table|grindstone|lectern|brewing_stand|^minecraft:anvil|wall_sign|potted_|flower_pot|sapling|coral|amethyst|dripstone|skull|tripwire|candle|campfire|tulip|poppy|orchid|daisy|lily|fern|torchflower/.test(name)) return null;
   if (name === 'minecraft:dark_oak_door') return null; // the entrance stays open
-  // The hall is furnished as a home (gonglu-furnish.js): the model's own hall
-  // decor — chest-wall shelf columns, wall signs, leaf bands, floating
-  // trapdoor shelves — comes out. Bookshelves stay (the study nook's wall).
   if (my >= 2 && my <= 10 && mx >= 8 && mx <= 21 && mz >= 15 && mz <= 28 &&
-      !/bookshelf|^minecraft:lantern|^minecraft:chain/.test(name)) return null;
+      !/^minecraft:lantern|^minecraft:chain/.test(name)) return null;
   // The interior floor: one flat tan layer (the raised bookshelf/green/moss
   // patches come out, the foundation goes tan).
   if (my === 0 && mx >= 7 && mx <= 22 && mz >= 14 && mz <= 29) return 'g_sjungle';
@@ -686,7 +710,8 @@ function lookFor(name) {
 }
 
 // Stair treads, slab tops and bamboo stumps the player can stand on, keyed "x,z".
-function makeModelSite(walk) {
+function makeModelSite(walk, obstacles) {
+  const furniture = obstacles.filter(obstacle => Number.isFinite(obstacle.floor));
   const tops = new Map();
   for (const [x, z, y, tread] of walk) {
     const key = x + ',' + z;
@@ -694,11 +719,17 @@ function makeModelSite(walk) {
     if (!tops.get(key).some(l => l.y === y)) tops.get(key).push({ y, tread: !!tread });
   }
   return {
-    foot: { x: 13.5, z: -6.5 },
+    foot: IKUN_ENTRY,
+    obstructed(x, z, feet) {
+      for (const obstacle of furniture) {
+        if (Math.abs(feet - obstacle.floor) < 0.3 && x >= obstacle.x0 && x <= obstacle.x1 && z >= obstacle.z0 && z <= obstacle.z1) return true;
+      }
+      return false;
+    },
     levels(x, z, out) {
       const list = tops.get(Math.floor(x) + ',' + Math.floor(z));
       if (list) for (const { y, tread } of list) out.push({ site: 'model', x0: Math.floor(x), x1: Math.floor(x) + 1, z0: Math.floor(z), z1: Math.floor(z) + 1, y, tread });
     },
-    spots: () => [{ x: 13.5, z: -6.5 }],
+    spots: () => [IKUN_ENTRY],
   };
 }
