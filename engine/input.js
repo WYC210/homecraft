@@ -44,6 +44,7 @@ export function createInput(canvas, handlers) {
       else if (k === 'm' || k === 'tab') { e.preventDefault(); handlers.map?.(); }
       else if (k === 'v') handlers.view?.();
       else if (k === 'p') handlers.phone?.();
+      else if (k === 'f3') { e.preventDefault(); handlers.debug?.(); }
       handlers.anyKey?.(e);
     }
     keys.add(k);

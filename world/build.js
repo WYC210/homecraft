@@ -1,6 +1,6 @@
 import { BoxBatch } from '@engine/world/blocks.js';
 import { buildIsland } from '@engine/world/terrain.js';
-import { buildForest } from '@engine/world/landscape.js';
+import { buildForest, buildTufts } from '@engine/world/landscape.js';
 import { ISLAND, LAND, BAY, TREES, MODEL_ORIGIN, LEHUN_ORIGIN, ORIGIN_GONGLU, ORIGIN_FERRIS } from './layout.js';
 import { buildLitematicIKUN } from './ikun-model.js';
 import { buildLitematicLEHUN } from './lehun-model.js';
@@ -9,6 +9,7 @@ import { buildLitematicFERRIS } from './ferris-model.js';
 import { buildSeaToys } from './sea.js';
 import { furnishGONGLU } from './gonglu-furnish.js';
 import { furnishLeHun } from './lehun-furnish.js';
+import { furnishBeach } from './beach-furnish.js';
 
 // Two cottages rebuilt one-to-one from litematics. The palette keeps every
 // block's properties, so stairs, slabs, doors, panes and lanterns come out as
@@ -34,7 +35,7 @@ export function build({ grid, layer, materials, stage }) {
     grid.fill(x, -5, z, x + 1, -3, z + 1, 'sand');
   }
   const B = new BoxBatch(layer);
-  const walk = [], bakes = [], obstacles = [];
+  const walk = [], bakes = [], obstacles = [], hotspots = [];
   const surfaces = {};
   const emitShape = (name, props, wx, wy, wz, kind, lookOverride = null) => {
     const cx = wx + 0.5, cz = wz + 0.5, L = lookOverride ?? lookFor(name);
@@ -126,11 +127,16 @@ export function build({ grid, layer, materials, stage }) {
     (name, props, wx, wy, wz) => {
       const mx = wx - MODEL_ORIGIN.x, my = wy - MODEL_ORIGIN.y, mz = wz - MODEL_ORIGIN.z;
       // The chicken's white eye rods were stored on the side of the head
-      // (x=1/6, z=8). Move each pair onto the matching front-eye position.
+      // (x=1/6, z=8). Move each pair onto the front face and rotate to face south.
       if (name === 'minecraft:end_rod' && (mx === 1 || mx === 6) &&
           (my === 6 || my === 7) && mz === 8) {
         const eyeX = mx === 1 ? 2 : 5;
-        emitShape(name, props, MODEL_ORIGIN.x + eyeX, wy, MODEL_ORIGIN.z + 12, kindIKUN(name, eyeX, 12));
+        emitShape(name, { ...props, facing: 'south' }, MODEL_ORIGIN.x + eyeX, wy, MODEL_ORIGIN.z + 13, kindIKUN(name, eyeX, 13));
+        return;
+      }
+      // The mouth stripe (mz=6) also needs to move to the front face, rotated to face south.
+      if (name === 'minecraft:end_rod' && mx >= 2 && mx <= 5 && my === 8 && mz === 6) {
+        emitShape(name, { ...props, facing: 'south' }, wx, wy, MODEL_ORIGIN.z + 13, kindIKUN(name, mx, 13));
         return;
       }
       emitShape(name, props, wx, wy, wz, kindIKUN(name, mx, mz));
@@ -145,10 +151,13 @@ export function build({ grid, layer, materials, stage }) {
     { id: 'ikun-fill-west', position: [MODEL_ORIGIN.x - 1.5, 5.5, iz], power: 4.5, radius: 8.5, direction: null },
     { id: 'ikun-fill-east', position: [MODEL_ORIGIN.x + 9.5, 5.5, iz], power: 4.5, radius: 8.5, direction: null },
     { id: 'ikun-fill-top', position: [ix, 12.5, iz], power: 2.5, radius: 7.5, direction: null },
-    { id: 'ikun-head-front', position: [ix, 8.5, MODEL_ORIGIN.z + 13.5], power: 5.5, radius: 6.5, direction: null },
+    { id: 'ikun-head-front', position: [ix, 8.5, MODEL_ORIGIN.z + 15], power: 6.5, radius: 7, direction: null },
     { id: 'ikun-head-top', position: [ix, 15.5, MODEL_ORIGIN.z + 14], power: 7, radius: 7.5, direction: null },
     { id: 'ikun-head-west', position: [MODEL_ORIGIN.x - 1, 8.5, iz], power: 3.5, radius: 7, direction: null },
     { id: 'ikun-head-east', position: [MODEL_ORIGIN.x + 9, 8.5, iz], power: 3.5, radius: 7, direction: null },
+    // Extra light for the eye area (the black face needs more illumination at night)
+    { id: 'ikun-eye-left', position: [MODEL_ORIGIN.x + 2.5, 7, MODEL_ORIGIN.z + 14], power: 3, radius: 4, direction: null },
+    { id: 'ikun-eye-right', position: [MODEL_ORIGIN.x + 5.5, 7, MODEL_ORIGIN.z + 14], power: 3, radius: 4, direction: null },
   );
   buildLitematicLEHUN(grid, LEHUN_ORIGIN, mapLeHun, () => 'model', (name, props, wx, wy, wz) => {
     const mx = wx - 1, my = wy - 4, mz = wz - 34;
@@ -228,17 +237,36 @@ export function build({ grid, layer, materials, stage }) {
   toys = buildSeaToys(layer, materials);
   stage.scene.add(toys.group);
   const forest = buildForest(grid, layer, TREES);
+  // Scattered grass and flowers across the island for a livelier look.
+  const tufts = [];
+  const rng = (seed => () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; })(42);
+  const inBuilding = (x, z) =>
+    (x >= -2 && x <= 12 && z >= -12 && z <= 12) ||  // IKUN area
+    (x >= -40 && x <= -20 && z >= -24 && z <= 0) || // GONGLU tower
+    (x >= 14 && x <= 30 && z >= -22 && z <= -6) ||  // Ferris wheel
+    (z >= 32);  // LeHun over bay
+  for (let i = 0; i < 100; i++) {
+    const x = -32 + rng() * 64;
+    const z = -22 + rng() * 48;
+    if (inBuilding(x, z)) continue;
+    const tiles = ['tall_grass', 'tall_grass', 'tall_grass', 'flower_red', 'flower_white', 'flower_violet'];
+    tufts.push({ x, z, tile: tiles[Math.floor(rng() * tiles.length)], s: 0.5 + rng() * 0.4 });
+  }
+  const tuftsMesh = buildTufts(layer, materials, tufts, 'island-flora');
   // Furnish the crafting tower's hall as a little home (obstacles keep the
   // nav clear around each piece; the TV rides surfaces.tvScreen), then move
   // LeHun cottage: a cherry gym below and a leisure loft above — its floor
   // pink lounge floor and stair register site treads into `walk` before the
   // site is built.
-  const planes = furnishGONGLU({ B, obstacles, bakes, surfaces });
+  const planes = furnishGONGLU({ B, obstacles, bakes, surfaces, hotspots });
   planes.push(...furnishLeHun({ B, walk, obstacles, bakes }));
+  planes.push(tuftsMesh);
+  furnishBeach({ B, obstacles, bakes });
   return {
     batches: { model: B },
     bakes,
     obstacles,
+    hotspots,
     surfaces,
     planes,
     forest,
@@ -572,6 +600,9 @@ function defineModelBlocks(grid) {
   grid.define('g_leaf', { kind: 'cutout', tex: { all: 'leaves' }, merge: true, map: '#4e8a36' });
   grid.define('g_book', { tex: { all: 'bookshelf' }, merge: true, map: '#a97d4f' });
   grid.define('g_birch', { tex: { all: 'paint' }, tint: 0xd7c185, merge: true, map: '#d7c185' });
+  // Deepslate portal frame blocks.
+  grid.define('d_tile', { tex: { all: 'paint' }, tint: 0x4a4a52, merge: true, map: '#4a4a52' });
+  grid.define('d_obsidian', { tex: { all: 'paint' }, tint: 0x1a0f29, merge: true, map: '#1a0f29' });
   grid.define('g_quartz', { tex: { all: 'paint' }, tint: 0xece9e2, merge: true, map: '#ece9e2' });
   grid.define('g_pinkc', { tex: { all: 'paint' }, tint: 0xe9a3b0, merge: true, map: '#e9a3b0' });
   grid.define('g_slantern', { tex: { all: 'paint' }, tint: 0xbcd6cc, emissive: 1, map: '#bcd6cc' });

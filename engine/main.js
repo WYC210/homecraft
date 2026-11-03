@@ -23,6 +23,7 @@ import { createSound } from './ui/sound.js';
 import { icon, setFace } from './ui/icons.js';
 import { createPhone } from './ui/phone.js';
 import { createWorkbench } from './ui/workbench.js';
+import { createPiano } from './ui/piano.js';
 import { createMailboxForm } from './ui/mailbox.js';
 import { createFlightPad } from './ui/flightpad.js';
 import { createPortal, arrival, visitWorld, isTravelling, placePortalControls } from './portal.js';
@@ -279,6 +280,7 @@ async function boot() {
   // The world keeps rendering while the dialog blocks movement.
   const panel = $('#panel');
   const workbench = createWorkbench(panel);
+  let destroyPiano = () => {};
   // A note sent from the mailbox's page raises the flag on the mailbox itself.
   const mailboxForm = createMailboxForm({ onSent: () => mailbox.raiseFlag() });
   const worldList = createWorldList({ onChoose(world) { closePage(); depart(world); } });
@@ -312,6 +314,7 @@ async function boot() {
     const page = pageEl(id);
     if (!page) return;
     worldList.destroy();
+    destroyPiano(); destroyPiano = () => {};
     // A page that is only a link (data-link) opens in a new tab.
     if (page.dataset.link) { const url = pageURL(page.dataset.link); if (url) window.open(url.href, '_blank', 'noopener'); return; }
     togglePhone(false);
@@ -324,7 +327,8 @@ async function boot() {
     // An existing website (data-embed) shows inside the card, with ↗ to open it in a tab.
     const embed = page.dataset.embed && pageURL(page.dataset.embed);
     popOut.hidden = !embed;
-    panel.dataset.kind = embed ? 'embed' : '';
+    const isPiano = page.hasAttribute('data-piano');
+    panel.dataset.kind = isPiano ? 'piano' : embed ? 'embed' : '';
     if (embed) {
       popOut.href = embed.href;
       popOut.setAttribute('aria-label', t('在新标签页打开', 'Open in a new tab'));
@@ -333,6 +337,7 @@ async function boot() {
       body.className = 'body page';
       body.innerHTML = page.innerHTML;
     }
+    if (isPiano) destroyPiano = createPiano(body);
     for (const li of body.querySelectorAll('[data-icon]')) li.style.setProperty('--icon', `url(${icon(li.dataset.icon).url})`);
     workbench.mount(body);
     mailboxForm.mount(body);
@@ -350,6 +355,7 @@ async function boot() {
   }
   function openPortal() {
     if (isTravelling() || portal?.busy) return;
+    destroyPiano(); destroyPiano = () => {};
     togglePhone(false); toggleWeatherMenu(false); minimap.toggleBig(false); rig.skipIntro();
     openStation = 'portal'; panel.dataset.station = 'portal'; panel.dataset.kind = '';
     $('#panelTitle').textContent = t('传送门', 'Portal');
@@ -370,7 +376,7 @@ async function boot() {
   // a card down. Both ends of the press must miss the cards and controls,
   // so a drag that wanders off a card does not count and text on a card
   // stays selectable.
-  const keepsOpen = target => target.closest('.work-deck > li, .about, .world-directory, button, a, form');
+  const keepsOpen = target => target.closest('.work-deck > li, .about, .world-directory, .piano-app, button, a, form, select, input, textarea, label');
   let pressedOutside = false;
   panel.addEventListener('pointerdown', e => { pressedOutside = !keepsOpen(e.target); });
   panel.addEventListener('click', e => { if (pressedOutside && !keepsOpen(e.target)) closePage(); });
@@ -384,6 +390,7 @@ async function boot() {
   });
   panel.addEventListener('close', () => {
     if (panel.open) return;
+    destroyPiano(); destroyPiano = () => {};
     worldList.destroy();
     mailboxForm.unmount();
     placePortalControls($('#hud'));
@@ -773,6 +780,53 @@ async function boot() {
     else if (openStation) $('#panelTitle').textContent = document.querySelector(`#pages .page[data-station="${openStation}"] h2`).textContent;
   });
 
+  // ---------- F3 Debug ----------
+  const f3debug = $('#f3debug');
+  let f3on = false;
+  function toggleF3() {
+    f3on = !f3on;
+    f3debug.hidden = !f3on;
+  }
+  function updateF3() {
+    if (!f3on) return;
+    const px = player.pos.x.toFixed(2), pz = player.pos.z.toFixed(2), py = player.y.toFixed(2);
+    const yawDeg = ((rig.yaw * 180 / Math.PI) % 360 + 360) % 360;
+    const facing = yawDeg < 45 || yawDeg >= 315 ? 'South (+Z)' : yawDeg < 135 ? 'West (-X)' : yawDeg < 225 ? 'North (-Z)' : 'East (+X)';
+    $('#f3-pos').innerHTML = `XYZ: <span class="f3-coords">${px} / ${py} / ${pz}</span>`;
+    $('#f3-facing').innerHTML = `Facing: ${facing} (${yawDeg.toFixed(1)}°)`;
+    $('#f3-floor').innerHTML = `Floor: ${player.floorY.toFixed(2)} | Flying: ${player.flying ? 'Yes' : 'No'}`;
+    $('#f3-biome').innerHTML = `Swimming: ${player.swimming ? 'Yes' : 'No'} | Island: ${player.island || 'ground'}`;
+    const { block, spot, island, water } = pick(innerWidth / 2, innerHeight / 2);
+    if (block) {
+      const [bx, by, bz] = block.cell || [Math.floor(block.x), Math.floor(block.y), Math.floor(block.z)];
+      $('#f3-target').innerHTML = 'Block';
+      $('#f3-block').innerHTML = `Type: <span class="f3-block">${block.type?.name || 'unknown'}</span>`;
+      $('#f3-blockpos').innerHTML = `Pos: <span class="f3-coords">${bx}, ${by}, ${bz}</span>`;
+      $('#f3-group').innerHTML = `Face: ${block.normal?.join(', ') || '?'}`;
+    } else if (island) {
+      const ix = island.point.x.toFixed(1), iy = island.point.y.toFixed(1), iz = island.point.z.toFixed(1);
+      $('#f3-target').innerHTML = 'Surface';
+      $('#f3-block').innerHTML = `Site: <span class="f3-block">${island.site || 'ground'}</span>`;
+      $('#f3-blockpos').innerHTML = `Pos: <span class="f3-coords">${ix}, ${iy}, ${iz}</span>`;
+      $('#f3-group').innerHTML = '';
+    } else if (water) {
+      $('#f3-target').innerHTML = 'Water';
+      $('#f3-block').innerHTML = `Surface: <span class="f3-block">pool</span>`;
+      $('#f3-blockpos').innerHTML = `Pos: <span class="f3-coords">${water.x.toFixed(1)}, ${POOL?.water || 0}, ${water.z.toFixed(1)}</span>`;
+      $('#f3-group').innerHTML = '';
+    } else if (spot) {
+      $('#f3-target').innerHTML = 'Hotspot';
+      $('#f3-block').innerHTML = `ID: <span class="f3-block">${spot.id}</span>`;
+      $('#f3-blockpos').innerHTML = '';
+      $('#f3-group').innerHTML = '';
+    } else {
+      $('#f3-target').innerHTML = '<span class="f3-none">Nothing</span>';
+      $('#f3-block').innerHTML = '';
+      $('#f3-blockpos').innerHTML = '';
+      $('#f3-group').innerHTML = '';
+    }
+  }
+
   // ---------- Input ----------
   const input = createInput(stage.renderer.domElement, {
     blocked: () => minimap.isBigOpen() || panel.open || weatherMenuOpen() || isTravelling() || !!portal?.busy,
@@ -800,6 +854,7 @@ async function boot() {
     hover: (x, y) => hover(x, y, true),
     anyKey: () => rig.skipIntro(),
     pad: () => flightPad?.state,
+    debug: toggleF3,
   });
 
   // ---------- Loop ----------
@@ -978,6 +1033,7 @@ async function boot() {
       const st = stats(), over = (v, max) => (v > max ? ' over' : '');
       debugEl.innerHTML = `<b class="${over(st.calls, BUDGET.calls)}">${st.calls} calls</b> · <b class="${over(st.triangles, BUDGET.triangles)}">${Math.round(st.triangles / 1000)}k tris</b> · <b class="${over(st.frameMs, BUDGET.frameMs)}">${st.frameMs} ms</b> · ${st.programs} programs · DPR ${st.pixelRatio}`;
     }
+    if (f3on && (debugClock === 0 || !debugEl)) updateF3();
 
     // Re-check throughout the visit, including later camera angles. Use the
     // uncapped frame interval, so long GPU stalls cannot hide behind physics dt.

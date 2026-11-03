@@ -50,6 +50,22 @@ const HUD = `
   <div id="tooltip" hidden></div>
   <div id="crosshair" hidden></div>
   <div id="aim" hidden></div>
+  <div id="f3debug" hidden>
+    <div class="f3-left">
+      <p class="f3-title">Homecraft Debug (F3)</p>
+      <p id="f3-pos"></p>
+      <p id="f3-facing"></p>
+      <p id="f3-floor"></p>
+      <p id="f3-biome"></p>
+    </div>
+    <div class="f3-right">
+      <p class="f3-title">Looking at</p>
+      <p id="f3-target"></p>
+      <p id="f3-block"></p>
+      <p id="f3-blockpos"></p>
+      <p id="f3-group"></p>
+    </div>
+  </div>
   <button id="prompt" hidden><kbd>F</kbd><i class="icon"></i><span></span></button>
   <!-- Touch screens, flying by hand: Minecraft's pocket D-pad steers and the
        rocker climbs and descends (ui/flightpad.js). -->

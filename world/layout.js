@@ -28,12 +28,33 @@ export const inPool = (x, z) => {
 };
 export const SPAWN = { x: 0.5, z: 18, heading: Math.PI };
 export const STATIONS = [
+  { id: 'piano', name: '钢琴', en: 'Piano', icon: 'works', at: [-19.75, 1.25], look: [-19.75, 0.05] },
   { id: 'mailbox', name: '留言', en: 'Mailbox', icon: 'mail', at: [0.5, 23.9], look: [0.5, 25.5] },
   { id: 'portal', name: '传送门', en: 'Portal', icon: 'portal', at: [8, 23.1], look: [8, 25.5] },
 ];
 export const MAILBOX = { x: 0.5, z: 25.5, yaw: Math.PI };
 export const PORTAL = { x: 8, z: 25.5, yaw: Math.PI };
-export const TREES = [[30, -12]];
+export const TREES = [
+  [30, -12],  // original
+  // North edge (behind buildings, forming a backdrop)
+  [-28, -24], [-12, -24], [8, -24], [24, -22],
+];
+
+// A dog roams the beach and central area, following visitors around.
+export const PETS = {
+  dog: {
+    anchors: [
+      [0.5, 20],    // near spawn/mailbox
+      [-10, 22],    // west beach
+      [15, 22],     // east beach
+      [0, 5],       // central area
+      [-15, 0],     // west side
+      [15, 0],      // east side
+      [5, -10],     // near IKUN
+    ],
+    home: [0.5, 20],
+  },
+};
 
 // The IKUN cottage from a litematic, east of the spawn lawn: its ground-level
 // entrance ramp starts at z = -6 and the raised floor (model layer 4) is the

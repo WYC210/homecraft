@@ -61,8 +61,12 @@ const bedArt = canvasTexture(128, 96, (ctx, w, h) => {
   for (const [x, y, ww] of [[8, 78, 34], [52, 86, 44], [96, 80, 24]]) ctx.fillRect(x, y, ww, 2);
 });
 
-export function furnishGONGLU({ B, obstacles, bakes, surfaces }) {
+export function furnishGONGLU({ B, obstacles, bakes, surfaces, hotspots }) {
   const foot = (x, z, w, d) => obstacles.push({ x0: x - w / 2, x1: x + w / 2, z0: z - d / 2, z1: z + d / 2, level: 0 });
+  const hotspot = (id, x, y, z, w, h, d) => hotspots.push({
+    id,
+    box: new THREE.Box3(new THREE.Vector3(x - w / 2, y, z - d / 2), new THREE.Vector3(x + w / 2, y + h, z + d / 2)),
+  });
   const bake = (id, x, y, z, power, radius, direction = null) => bakes.push({ id, position: [x, y, z], power, radius, direction });
   const plane = (w, h, tex, x, y, z, ry = 0) => {
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), tex ? new THREE.MeshLambertMaterial({ map: tex }) : new THREE.MeshBasicMaterial());
@@ -181,6 +185,34 @@ export function furnishGONGLU({ B, obstacles, bakes, surfaces }) {
   }
   B.box(-21.5, FLOOR + 0.005, 12.2, 1.8, 0.02, 0.9, L.mat);
   B.box(-14.9, FLOOR + 0.005, 5.9, 0.9, 0.02, 1.8, L.mat);
+
+  // A compact upright piano fills the open wall between the TV console and wardrobe.
+  const pianoX = -19.75, pianoZ = 0.05;
+  B.box(pianoX, FLOOR, pianoZ, 2.55, 0.24, 0.72, L.walnut);
+  B.box(pianoX, FLOOR + 0.24, pianoZ, 2.42, 1.05, 0.58, L.dark);
+  B.box(pianoX, FLOOR + 1.26, pianoZ, 2.58, 0.12, 0.7, L.walnut);
+  B.box(pianoX, FLOOR + 0.92, pianoZ + 0.29, 2.18, 0.42, 0.06, L.oak);
+  B.box(pianoX, FLOOR + 1.34, pianoZ + 0.28, 2.2, 0.08, 0.32, L.sheet);
+  const whiteKeyWidth = 2.06 / 14;
+  for (let i = 0; i < 14; i++) {
+    B.box(pianoX - 1.03 + whiteKeyWidth * (i + 0.5), FLOOR + 1.42, pianoZ + 0.31,
+      whiteKeyWidth - 0.012, 0.08, 0.34, L.sheet);
+  }
+  for (const i of [0, 1, 3, 4, 5, 7, 8, 10, 11, 12]) {
+    B.box(pianoX - 1.03 + whiteKeyWidth * (i + 1), FLOOR + 1.5, pianoZ + 0.18,
+      whiteKeyWidth * 0.56, 0.16, 0.18, L.dark);
+  }
+  B.box(pianoX, FLOOR + 1.75, pianoZ + 0.02, 1.18, 0.06, 0.08, L.walnut, { rx: -0.22 });
+  B.box(pianoX, FLOOR + 1.69, pianoZ + 0.25, 1.18, 0.04, 0.04, L.steel);
+  for (const dx of [-0.62, 0.62]) B.box(pianoX + dx, FLOOR, pianoZ + 0.02, 0.1, 1.1, 0.1, L.dark);
+  for (const dx of [-0.22, 0.22]) B.box(pianoX + dx, FLOOR, pianoZ + 0.39, 0.06, 0.06, 0.22, L.steel, { rx: -0.2 });
+  const benchZ = 1.12;
+  B.box(pianoX, FLOOR + 0.42, benchZ, 0.95, 0.12, 0.42, L.linen);
+  for (const dx of [-0.36, 0.36]) B.box(pianoX + dx, FLOOR, benchZ, 0.08, 0.42, 0.08, L.dark);
+  foot(pianoX, pianoZ, 2.65, 0.82);
+  foot(pianoX, benchZ, 1.0, 0.5);
+  hotspot('piano', pianoX, FLOOR, 0.75, 2.8, 1.9, 2.2);
+  bake('piano-warmth', pianoX, FLOOR + 1.6, pianoZ + 0.3, 0.65, 4.5, [0, -1, 0.2]);
 
   return planes;
 }
