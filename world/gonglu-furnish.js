@@ -5,7 +5,8 @@
 // lighting is baked, and each piece registers an obstacle for the nav.
 import * as THREE from 'three';
 import { canvasTexture } from '@engine/world/textures.js';
-import { PIANO } from './layout.js';
+import { PIANO, COMPUTER } from './layout.js';
+import { addRestPoint } from './rest-points.js';
 
 const FLOOR = 1;
 
@@ -101,6 +102,7 @@ export function furnishGONGLU({ B, obstacles, bakes, surfaces, hotspots }) {
   B.box(-24.9, FLOOR + 0.55, 3.95, 0.42, 0.42, 0.14, L.sage(0x6e7f5e), { ry: 0.5 });
   B.box(-22.15, FLOOR + 0.55, 3.95, 0.42, 0.42, 0.14, L.sage(0x9a6a55), { ry: -0.4 });
   foot(-23.5, 3.8, 3.7, 1.3);
+  for (const x of [-24.2, -22.8]) addRestPoint({ id: `home-sofa-${x}`, name: '客厅沙发', en: 'Living room sofa', x, y: FLOOR + 0.6, z: 3.62, floor: FLOOR, yaw: Math.PI });
   B.box(-23.5, FLOOR + 0.4, 1.5, 1.3, 0.06, 0.7, L.marble);
   for (const [dx, dz] of [[-0.58, -0.28], [0.58, -0.28], [-0.58, 0.28], [0.58, 0.28]]) {
     B.box(-23.5 + dx, FLOOR, 1.5 + dz, 0.05, 0.4, 0.05, L.steel);
@@ -123,7 +125,7 @@ export function furnishGONGLU({ B, obstacles, bakes, surfaces, hotspots }) {
     bake('pendant' + i, x, FLOOR + 3.4, 1.5, 3.2, 10, [0, -1, 0]);
   }
 
-  const deskX = -27.32, deskZ = 9.8;
+  const deskX = COMPUTER.x, deskZ = COMPUTER.z;
   B.box(-26.5, FLOOR + 0.004, deskZ, 2.85, 0.016, 3.65, L.rug);
   B.box(-26.5, FLOOR + 0.02, deskZ, 2.65, 0.006, 3.45, { tex: 'linen', tint: 0xc0b7a4 });
   B.at(deskX, FLOOR, deskZ, Math.PI / 2, () => {
@@ -166,6 +168,7 @@ export function furnishGONGLU({ B, obstacles, bakes, surfaces, hotspots }) {
     B.box(-1.15, 0.93, -0.23, 0.2, 0.14, 0.18, L.leaf);
   });
   for (const offset of [-0.47, 0.47]) planes.push(plane(0.87, 0.49, monitorArt, deskX - 0.204, FLOOR + 1.36, deskZ - offset, Math.PI / 2));
+  hotspot('computer', deskX, FLOOR + 0.72, deskZ, 0.9, 1.1, 2.1);
   bake('desk-screen', deskX + 0.05, FLOOR + 1.3, deskZ, 0.5, 3, [0.7, -0.2, 0]);
   bake('desk-lamp', deskX + 0.16, FLOOR + 1.4, deskZ - 1.13, 0.9, 4, [0, -1, 0]);
   foot(deskX, deskZ, 0.94, 2.9);
@@ -193,6 +196,7 @@ export function furnishGONGLU({ B, obstacles, bakes, surfaces, hotspots }) {
   B.box(bedX, FLOOR + 0.611, 10.62, 2.02, 0.035, 0.53, accent);
   for (const offset of [-0.99, 0.99]) B.box(bedX + offset, FLOOR + 0.35, 10.62, 0.045, 0.26, 0.53, accent);
   foot(bedX, 11.5, 2.23, 2.65);
+  addRestPoint({ id: 'home-bed', name: '卧室床', en: 'Bed', x: bedX, y: FLOOR + 0.61, z: 11.45, floor: FLOOR, yaw: Math.PI, kind: 'lie' });
   for (const side of [-1, 1]) {
     const nightstandX = bedX + side * 1.5;
     for (const offset of [-0.2, 0.2]) B.box(nightstandX + offset, FLOOR + 0.03, 12.28, 0.045, 0.15, 0.42, L.dark);
@@ -215,6 +219,7 @@ export function furnishGONGLU({ B, obstacles, bakes, surfaces, hotspots }) {
   B.box(bedX, FLOOR + 0.39, bedBenchZ, 1.63, 0.09, 0.48, { tex: 'linen', tint: 0x555f53 });
   B.box(bedX + 0.47, FLOOR + 0.48, bedBenchZ, 0.33, 0.025, 0.49, bedding);
   foot(bedX, bedBenchZ, 1.73, 0.58);
+  for (const offset of [-0.4, 0.4]) addRestPoint({ id: `home-bed-bench-${offset}`, name: '床尾凳', en: 'Bedroom bench', x: bedX + offset, y: FLOOR + 0.48, z: bedBenchZ, floor: FLOOR, yaw: Math.PI });
   B.box(bedX, FLOOR + 1.7, 12.88, 1.45, 0.9, 0.06, L.walnut);
   planes.push(plane(1.3, 0.75, bedArt, bedX, FLOOR + 2.15, 12.84, Math.PI));
   bake('bed-art', bedX, FLOOR + 2.7, 12.6, 0.6, 3.5, [0, -0.5, -1]);

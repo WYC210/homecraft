@@ -15,6 +15,7 @@
 import * as THREE from 'three';
 import * as L from '@world/layout.js';
 import { SWIM_PIVOT } from './avatar.js';
+import { findShoreExit, routeShoreExit } from './shore.js';
 
 const WALK = 3.6, RUN = 6.2, FLY = 8.5, FLY_FAST = 16, CLIMB = 6, JUMP = 6.4, GRAVITY = 19, RADIUS = 0.3, SEA = -0.9;
 // What the world has: stations, a spawn point, and optionally a house (left
@@ -61,8 +62,11 @@ export function createPlayer({ avatar, nav, grid = null, ground = null, onArrive
   // it is resting on the bottom (`rest`), lying there (`lie`, eased), heading
   // down or up on its own (`dive`, `rise`), or in a dive or a climb (`anim`).
   let swim = null, flewOut = 0;
+  let resting = null;
+  let vehicle = null;
   const eye = new THREE.Vector3(), mouth = new THREE.Vector3(), bodyTurn = new THREE.Euler(0, 0, 0, 'XYZ'), up = new THREE.Vector3(0, 1, 0);
   const swimInfo = { x: 0, z: 0, c: 0, speed: 0, surface: false };
+  const shoreExit = { edge: { x: 0, z: 0 }, out: { x: 0, y: 0, z: 0 }, ox: 0, oz: 0 };
 
   // One step on foot. Stepping from the house's grid onto something outside
   // it (the pier, a bridge) hands over to that, and back again.
@@ -128,6 +132,7 @@ export function createPlayer({ avatar, nav, grid = null, ground = null, onArrive
 
   function cancel() { path = null; goal = null; then = null; rush = false; through = false; }
   function goTo(x, z, station = null) {
+    if (resting && !standUp()) return false;
     if (mode !== 'ground') return false;
     if (island && nav.canStand(pos.x, pos.z, level) && nav.canStand(x, z)) {
       const found = nav.findPath(pos, { x, z });
@@ -145,6 +150,7 @@ export function createPlayer({ avatar, nav, grid = null, ground = null, onArrive
   // Walk a line of points (the mountain road), first walking on the house's
   // grid to `via` when the player is not on the mountain yet. Climbs run.
   function follow(points, via = null, after = null) {
+    if (resting && !standUp()) return false;
     if (!['ground', 'ladder'].includes(mode) || !points.length) return false;
     if (via && !island) {
       if (!goTo(via.x, via.z)) return false;
@@ -158,16 +164,69 @@ export function createPlayer({ avatar, nav, grid = null, ground = null, onArrive
   // portal's light, on the way into it or out of it. `look` is the point to
   // face at the end.
   function walkThrough(points, after = null, look = null) {
+    if (resting && !standUp()) return false;
     if (mode !== 'ground' || island || !points.length) return false;
     cancel(); path = points.slice(); then = after; goal = look ? { look } : null; through = true;
     return true;
   }
   function visit(id) { const s = STATIONS.find(s => s.id === id); return s ? goTo(...s.at, s) : false; }
-  function settle() { velocity.set(0, 0, 0); vy = 0; speed = 0; pilot = null; zip = null; ladder = null; web.visible = false; standing = null; swim = null; flewOut = 0; }
-  function teleport(x, z, station = null) {
+  function settle() { vehicle?.stop(); vehicle = null; velocity.set(0, 0, 0); vy = 0; speed = 0; pilot = null; zip = null; ladder = null; web.visible = false; standing = null; swim = null; resting = null; flewOut = 0; }
+  function mountVehicle(controller) {
+    if (!controller || !['ground', 'swim'].includes(mode) || resting) return false;
     cancel(); settle();
+    vehicle = controller; mode = 'vehicle'; island = null;
+    syncVehicle(); place(0);
+    return true;
+  }
+  function syncVehicle() {
+    const rider = vehicle.rider;
+    pos.x = rider.x; pos.z = rider.z;
+    y = level = rider.y; heading = rider.heading;
+  }
+  function dismountVehicle() {
+    if (!vehicle) return false;
+    const exit = vehicle.exit();
+    if (!exit) return false;
+    const support = exit.water ? null : ground?.canStand(exit.x, exit.z, exit.y);
+    if (!exit.water && !support && !nav.canStand(exit.x, exit.z, exit.y)) return false;
+    cancel(); settle();
+    pos.x = exit.x; pos.z = exit.z;
+    if (exit.water) intoWater(surfaceLevel(0));
+    else { mode = 'ground'; y = level = support?.y ?? exit.y; island = support?.site ?? null; standing = support; }
+    place(0);
+    return true;
+  }
+  function restAt(point) {
+    if (mode !== 'ground' || !point || Math.abs(level - point.floor) > 0.4 || Math.hypot(pos.x - point.x, pos.z - point.z) > 2.5) return false;
+    const exit = { x: pos.x, z: pos.z, y: level, site: island };
+    const support = ground?.canStand(exit.x, exit.z, exit.y);
+    if ((!support || Math.abs(support.y - exit.y) > 0.3) && !nav.canStand(exit.x, exit.z, exit.y)) return false;
+    cancel(); settle();
+    resting = { point, exit, pose: { speed: 0, fly: -1, rest: point.kind } };
+    mode = 'rest';
+    pos.x = point.x; pos.z = point.z;
+    y = point.kind === 'lie' ? point.y : point.y - 0.675;
+    level = point.floor; heading = point.yaw;
+    place(0);
+    return true;
+  }
+  function standUp() {
+    if (!resting) return false;
+    const exit = resting.exit;
+    let support = ground?.canStand(exit.x, exit.z, exit.y);
+    if (support && Math.abs(support.y - exit.y) > 0.3) support = null;
+    if (!support && !nav.canStand(exit.x, exit.z, exit.y)) return false;
+    pos.x = exit.x; pos.z = exit.z;
+    y = level = support?.y ?? exit.y;
+    island = support?.site ?? exit.site; standing = support;
+    resting = null; mode = 'ground';
+    place(0);
+    return true;
+  }
+  function teleport(x, z, station = null) {
     const stand = nav.nearestStand(x, z);
     if (!stand || !nav.canStand(stand.x, stand.z)) return false;
+    cancel(); settle();
     pos.set(stand.x, 0, stand.z); mode = 'ground'; island = null;
     y = level = nav.heightAt(pos.x, pos.z);
     if (station?.look) heading = Math.atan2(station.look[0] - pos.x, station.look[1] - pos.z);
@@ -182,10 +241,13 @@ export function createPlayer({ avatar, nav, grid = null, ground = null, onArrive
   }
 
   function jump() {
+    if (resting && !standUp()) return;
     if (mode !== 'ground') return;
     mode = 'air'; vy = JUMP;
   }
   function startFlying() {
+    if (vehicle && !dismountVehicle()) return;
+    if (resting && !standUp()) return;
     if (mode === 'fly') return;
     const fromWater = leaveWater(0.7);
     cancel(); ladder = null; mode = 'fly'; island = null; standing = null; velocity.set(0, 0, 0); vy = 0; zip = null; web.visible = false;
@@ -239,11 +301,9 @@ export function createPlayer({ avatar, nav, grid = null, ground = null, onArrive
   function wallExit(dx, dz) {
     const ladderSide = pos.x > POOL_LADDER.x0 - 0.3 && pos.x < POOL_LADDER.x1 + 0.3;
     const north = (ladderSide ? POOL_LADDER.z + 0.32 : POOL.z0 + EDGE) + 0.06;
-    // In the ring ocean: climb out wherever there is land to push against.
-    if (atSeaFloor(pos.x, pos.z)) {
-      const out = { x: pos.x + dx * 0.55, z: pos.z + dz * 0.55 };
-      return nav.canStand(out.x, out.z) ? { edge: { x: pos.x - dx * 0.25, z: pos.z - dz * 0.25 }, out, ox: dx, oz: dz } : null;
-    }
+    if (ladderSide && dz < -0.5 && pos.z < north) return exitAt(pos.x, POOL.z0, 0, -1);
+    if (findShoreExit(nav, pos.x, pos.z, dx, dz, WATER, 1.2, shoreExit)) return shoreExit;
+    if (atSeaFloor(pos.x, pos.z)) return null;
     if (dz < -0.5 && pos.z < north) return exitAt(pos.x, POOL.z0, 0, -1);
     if (dx < -0.5 && pos.x < POOL.x0 + EDGE + 0.06) return exitAt(POOL.x0, pos.z, -1, 0);
     if (dx > 0.5 && pos.x > POOL.x1 - EDGE - 0.06) return exitAt(POOL.x1, pos.z, 1, 0);
@@ -299,7 +359,7 @@ export function createPlayer({ avatar, nav, grid = null, ground = null, onArrive
   function leavePool(x, z, after = null) {
     if (mode !== 'swim' || swim.anim) return false;
     const along = (v, lo, hi) => Math.min(hi - 0.5, Math.max(lo + 0.5, v));
-    const exits = [exitAt(along(x, POOL.x0, POOL.x1), POOL.z0, 0, -1), exitAt(POOL.x0, along(z, POOL.z0, POOL.z1), -1, 0), exitAt(POOL.x1, along(z, POOL.z0, POOL.z1), 1, 0)].filter(Boolean);
+    const exits = [exitAt(along(x, POOL.x0, POOL.x1), POOL.z0, 0, -1), exitAt(POOL.x0, along(z, POOL.z0, POOL.z1), -1, 0), exitAt(POOL.x1, along(z, POOL.z0, POOL.z1), 1, 0), routeShoreExit(nav, pos.x, pos.z, x, z, WATER)].filter(Boolean);
     const cost = e => Math.hypot(e.edge.x - pos.x, e.edge.z - pos.z) + Math.hypot(e.out.x - x, e.out.z - z);
     const exit = exits.sort((a, b) => cost(a) - cost(b))[0];
     if (!exit) return false;
@@ -332,21 +392,30 @@ export function createPlayer({ avatar, nav, grid = null, ground = null, onArrive
       if (u >= 1) { s.anim = null; s.wet = true; s.vy = -1.1; s.vx = a.nx * 1.3; s.vz = a.nz * 1.3; }
     } else {
       // Up to the lip with the hands on the coping, then over onto the deck.
-      const { from, exit } = a, lip = WATER + 0.62, rise = smooth(Math.min(1, u / 0.5)), over = smooth(Math.max(0, (u - 0.5) / 0.5));
+      const { from, exit } = a, floor = exit.out.y ?? 0, lip = Math.max(WATER + 0.62, floor + 0.3), rise = smooth(Math.min(1, u / 0.5)), over = smooth(Math.max(0, (u - 0.5) / 0.5));
       pos.x = from.x + (exit.edge.x - from.x) * rise + (exit.out.x - exit.edge.x) * over;
       pos.z = from.z + (exit.edge.z - from.z) * rise + (exit.out.z - exit.edge.z) * over;
-      s.c = u < 0.5 ? from.c + (lip - from.c) * rise : lip + (PIVOT - lip) * over;
+      s.c = u < 0.5 ? from.c + (lip - from.c) * rise : lip + (floor + PIVOT - lip) * over;
       s.pitch = u < 0.5 ? from.pitch + (0.3 - from.pitch) * rise : 0.3 * (1 - over);
       s.roll = from.roll * (1 - rise); s.lie = 0;
       if (!a.dripped && u > 0.45) { a.dripped = true; onWater?.('climb', exit.edge.x, WATER, exit.edge.z, 0.45); }
       if (u >= 1) {
         pos.x = exit.out.x; pos.z = exit.out.z;
-        mode = 'ground'; island = null; standing = null; swim = null; y = level = 0;
+        mode = 'ground'; island = null; standing = null; swim = null; y = level = floor;
         a.after?.();
         return;
       }
     }
     y = s.c - PIVOT;
+  }
+
+  function clearWater(x, z, c) {
+    return !grid || (
+      !solidAt(Math.floor(x - RADIUS), Math.floor(c), Math.floor(z)) &&
+      !solidAt(Math.floor(x + RADIUS), Math.floor(c), Math.floor(z)) &&
+      !solidAt(Math.floor(x), Math.floor(c), Math.floor(z - RADIUS)) &&
+      !solidAt(Math.floor(x), Math.floor(c), Math.floor(z + RADIUS))
+    );
   }
 
   function swimming(dt, input, cameraYaw) {
@@ -393,7 +462,10 @@ export function createPlayer({ avatar, nav, grid = null, ground = null, onArrive
     const to = inPoolBounds(pos.x + s.vx * dt, pos.z + s.vz * dt, s.c);
     if (Math.abs(to.x - pos.x - s.vx * dt) > 1e-4) s.vx = 0;
     if (Math.abs(to.z - pos.z - s.vz * dt) > 1e-4) s.vz = 0;
-    pos.x = to.x; pos.z = to.z;
+    if (clearWater(to.x, to.z, s.c)) { pos.x = to.x; pos.z = to.z; }
+    else if (clearWater(to.x, pos.z, s.c)) { pos.x = to.x; s.vz = 0; }
+    else if (clearWater(pos.x, to.z, s.c)) { pos.z = to.z; s.vx = 0; }
+    else { s.vx = 0; s.vz = 0; }
     // Pushing against a side at the surface climbs out there.
     if (manual && s.c > surface - 0.25) {
       const exit = wallExit(dx, dz);
@@ -431,6 +503,8 @@ export function createPlayer({ avatar, nav, grid = null, ground = null, onArrive
   // with their hands at the anchor and a vault over the top; a floor or a top
   // ends just above it and a short drop.
   function zipTo(target) {
+    if (vehicle && !dismountVehicle()) return false;
+    if (resting && !standUp()) return false;
     if (mode === 'zip') return false;
     leaveWater(0.6);
     cancel(); ladder = null; pilot = null; velocity.set(0, 0, 0); vy = 0;
@@ -494,11 +568,13 @@ export function createPlayer({ avatar, nav, grid = null, ground = null, onArrive
     spots.sort((a, b) => Math.hypot(a.x - pos.x, a.z - pos.z) - Math.hypot(b.x - pos.x, b.z - pos.z));
     return spots.some(spot => flyTo(spot.x, spot.z));
   }
-  function toggleFly() { if (mode === 'fly') return stopFlying(); startFlying(); return true; }
+  function toggleFly() { if (vehicle) return false; if (mode === 'fly') return stopFlying(); startFlying(); return true; }
 
   // Fly to a tapped point and land there. Points inside the house are reached
   // on foot from the terrace; leaving the house goes out by the front doors.
   function flyTo(x, z) {
+    if (vehicle && !dismountVehicle()) return false;
+    if (resting && !standUp()) return false;
     let target = null;
     const g = ground?.topAt(x, z), stand = g && ground.nearestStand(x, z, g.y);
     if (stand) target = { x: stand.x, z: stand.z, y: stand.y, island: stand.site };
@@ -700,7 +776,14 @@ export function createPlayer({ avatar, nav, grid = null, ground = null, onArrive
   }
 
   function update(dt, input, cameraYaw, firstPerson = false) {
-    if (mode === 'zip') zipping(dt);
+    if (mode === 'vehicle') {
+      vehicle.update(dt, input);
+      syncVehicle();
+    }
+    else if (mode === 'rest') {
+      if (Math.hypot(input.x, input.z) > 0.08 || input.up || input.down) standUp();
+    }
+    else if (mode === 'zip') zipping(dt);
     else if (mode === 'swim') swimming(dt, input, cameraYaw);
     else if (mode === 'ladder') climbLadder(dt, input, cameraYaw);
     else if (mode === 'fly') fly(dt, input, cameraYaw);
@@ -710,13 +793,25 @@ export function createPlayer({ avatar, nav, grid = null, ground = null, onArrive
       if (mode === 'ground') y += (level - y) * (1 - Math.exp(-dt * 18));
     }
     // In first person the body faces the view, except lying on the pool's floor.
-    if (firstPerson && !(mode === 'swim' && swim.rest)) heading = cameraYaw + Math.PI;
+    if (firstPerson && mode !== 'rest' && mode !== 'vehicle' && !(mode === 'swim' && swim.rest)) heading = cameraYaw + Math.PI;
     place(dt, input);
     drawWeb();
   }
 
   // Avatar, pose and the blob shadow on whatever is below.
   function place(dt, input = { run: false }) {
+    if (vehicle) {
+      avatar.root.position.set(pos.x, y, pos.z); avatar.root.rotation.y = heading;
+      avatar.update(dt, vehicle.pose);
+      avatar.blob.visible = false;
+      return;
+    }
+    if (resting) {
+      avatar.root.position.set(pos.x, y, pos.z); avatar.root.rotation.y = heading;
+      avatar.update(dt, resting.pose);
+      avatar.blob.visible = false;
+      return;
+    }
     if (mode === 'swim') {
       // In the water the avatar is placed by its middle; falling in, it keeps the jump's pose.
       const s = swim, sp = Math.hypot(s.vx, s.vz);
@@ -749,9 +844,11 @@ export function createPlayer({ avatar, nav, grid = null, ground = null, onArrive
 
   return {
     pos, web, update, goTo, follow, walkThrough, visit, cancel, teleport, jump, toggleFly, startFlying, stopFlying, flyTo, zipTo,
-    enterPool, swimTo, leavePool, toggleDive, flyIntoPool,
-    get y() { return y; }, get heading() { return heading; }, get floorY() { return y; },
-    get moving() { return speed > 0.3 || !!zip || (mode === 'fly' && velocity.lengthSq() > 0.1) || (mode === 'swim' && Math.hypot(swim.vx, swim.vz) > 0.3); },
+    enterPool, swimTo, leavePool, toggleDive, flyIntoPool, restAt, standUp, mountVehicle, dismountVehicle,
+    get vehicle() { return vehicle; },
+    get resting() { return resting?.point ?? null; },
+    get y() { return y; }, get heading() { return heading; }, get floorY() { return resting ? level : y; },
+    get moving() { return speed > 0.3 || (vehicle && Math.abs(vehicle.speed) > 0.3) || !!zip || (mode === 'fly' && velocity.lengthSq() > 0.1) || (mode === 'swim' && Math.hypot(swim.vx, swim.vz) > 0.3); },
     get travelling() { return !!path?.length || !!pilot || !!zip; }, get path() { return path; },
     get zipping() { return !!zip; },
     get flying() { return mode === 'fly'; }, get island() { return island; }, get mode() { return mode; },

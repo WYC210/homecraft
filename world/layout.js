@@ -15,6 +15,7 @@ export const LAND = { x0: -36, x1: 38, z0: -26, z1: 31 };
 // the flat sea sheet is cut out entirely. BAY is the dug beach-entry part.
 export const POOL = { x0: -400, x1: 400, z0: -400, z1: 400, water: -0.32, bed: -3 };
 export const BAY = { x0: -36, x1: 36, z0: 29, z1: 56 };
+export const BOARDWALK = { x0: -31, x1: 31, step: 1.5, z: 28.25, width: 1.34, depth: 1.9 };
 // Swimmable water: the bay plus the ocean ring around the island (everything
 // inside the grid but off the sand). The engine reads this for swimming.
 export const inPool = (x, z) => {
@@ -29,7 +30,9 @@ export const inPool = (x, z) => {
 };
 export const SPAWN = { x: 0.5, z: 18, heading: Math.PI };
 export const PIANO = { x: -16.6, z: -0.1 };
+export const COMPUTER = { x: -27.32, z: 9.8, floor: 1 };
 export const STATIONS = [
+  { id: 'computer', name: '电脑', en: 'Computer', icon: 'works', at: [COMPUTER.x + 2.2, COMPUTER.z], look: [COMPUTER.x, COMPUTER.z], floor: COMPUTER.floor },
   { id: 'piano', name: '钢琴', en: 'Piano', icon: 'works', at: [PIANO.x, PIANO.z + 2.2], look: [PIANO.x, PIANO.z] },
   { id: 'mailbox', name: '留言', en: 'Mailbox', icon: 'mail', at: [0.5, 23.9], look: [0.5, 25.5] },
   { id: 'portal', name: '传送门', en: 'Portal', icon: 'portal', at: [8, 23.1], look: [8, 25.5] },
@@ -64,6 +67,10 @@ export const IKUN_CENTER = {
   z: MODEL_ORIGIN.z + IKUN_SIZE[2] * IKUN_SCALE[2] / 2,
 };
 export const IKUN_ENTRY = { x: IKUN_CENTER.x, z: MODEL_ORIGIN.z + IKUN_SIZE[2] * IKUN_SCALE[2] + 0.65 };
+export const RESIDENT_HOME = {
+  approach: { x: IKUN_CENTER.x - 0.1, z: 0.8, y: 4 },
+  bed: { id: 'ikun-resident-bed', name: 'IKUN 的床', en: 'IKUN bed', x: IKUN_CENTER.x + 1.45, y: 4.52, z: 0.8, floor: 4, yaw: 0, kind: 'lie' },
+};
 // The LeHun cottage from a litematic, hovering over the swimming bay: 18
 // wide centred on the bay (x -9..8), base four metres above the water (the
 // grid tops out at y = 27, so 4 is the highest the 24-layer model can sit).

@@ -196,6 +196,13 @@ export function createAvatar(skinUrl, { onFace } = {}) {
     }
     // Holding the phone: the right arm forward and in, the head bowed to it.
     if (phoneOut) { target.armR = -1.2; target.armRz = 0.42; }
+    if (s.rest) {
+      const pitch = s.rest === 'recline' ? -0.7 : 0;
+      Object.assign(target, { legR: s.rest === 'lie' ? 0 : -Math.PI / 2 - pitch, legL: s.rest === 'lie' ? 0 : -Math.PI / 2 - pitch,
+        legRz: 0.05, legLz: -0.05, armR: s.rest === 'lie' ? 0 : -0.35, armL: s.rest === 'lie' ? 0 : -0.35, armRz: 0.05, armLz: -0.05, lean: pitch });
+    }
+    if (s.ride) Object.assign(target, { legR: -1.05, legL: -1.05, legRz: -0.28, legLz: 0.28,
+      armR: -1.25, armL: -1.25, armRz: 0.1, armLz: -0.1, lean: 0.12 });
     const k = 1 - Math.exp(-dt * 14);
     for (const key in pose) pose[key] += (target[key] - pose[key]) * k;
 
@@ -203,7 +210,13 @@ export function createAvatar(skinUrl, { onFace } = {}) {
     legR.rotation.z = pose.legRz; legL.rotation.z = pose.legLz;
     armR.rotation.x = pose.armR; armL.rotation.x = pose.armL;
     armR.rotation.z = pose.armRz; armL.rotation.z = pose.armLz;
-    if (w) {
+    if (s.rest === 'lie') {
+      body.rotation.set(-Math.PI / 2, 0, 0);
+      body.position.set(0, 0.24, 0.9);
+    } else if (s.rest || s.ride) {
+      body.rotation.set(pose.lean, 0, 0);
+      body.position.set(0, 0.675 * (1 - Math.cos(pose.lean)), -0.675 * Math.sin(pose.lean));
+    } else if (w) {
       // Pitched about the middle of the body, and rolled about its length to
       // lie face up; a slow bob while afloat.
       body.rotation.set(w.pitch, w.roll, 0);

@@ -1,4 +1,5 @@
 import { buildTradingStudio } from './lehun-trading.js';
+import { addRestPoint } from './rest-points.js';
 
 const GROUND = 12;
 const FLOOR = 19;
@@ -69,6 +70,7 @@ export function furnishLeHun({ B, walk, obstacles, bakes }) {
   B.box(9.6, GROUND + 0.39, 43.0, 1.5, 0.07, 0.44, L.pink);
   for (const x of [8.95, 10.25]) B.box(x, GROUND, 43.0, 0.09, 0.25, 0.45, L.gymFrame);
   foot(9.6, 43.0, 1.7, 0.6, 0);
+  addRestPoint({ id: 'lehun-gym-bench', name: '乐魂健身凳', en: 'LeHun gym bench', x: 9.6, y: GROUND + 0.46, z: 43, floor: GROUND });
   B.box(12.5, GROUND + 0.05, 45.9, 1.15, 0.18, 2.05, L.gymFrame);
   B.box(12.5, GROUND + 0.23, 45.95, 0.86, 0.035, 1.7, L.gymGraphite);
   for (const x of [11.97, 13.03]) {
@@ -93,6 +95,7 @@ export function furnishLeHun({ B, walk, obstacles, bakes }) {
   }
   B.box(7.8, GROUND + 0.01, 38.0, 0.62, 0.02, 1.7, L.pink);
   B.box(8.75, GROUND + 0.01, 38.3, 0.62, 0.02, 1.7, L.cream);
+  for (const [x, z] of [[7.8, 38], [8.75, 38.3]]) addRestPoint({ id: `lehun-mat-${x}`, name: '乐魂休息垫', en: 'LeHun exercise mat', x, y: GROUND + 0.03, z, floor: GROUND, kind: 'lie' });
   B.box(8.3, GROUND, 37.45, 1.1, 0.4, 0.35, L.cherry);
   B.box(8.3, GROUND + 0.4, 37.45, 1.2, 0.05, 0.42, L.white);
   foot(8.3, 37.45, 1.3, 0.5, 0);

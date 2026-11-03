@@ -7,15 +7,20 @@
 <!-- The world draws its own day and night. -->
 <meta name="color-scheme" content="only light">
 <meta name="darkreader-lock">
-<title>My Home</title>
-<meta name="description" content="">
+<title>Wyc的世界</title>
+<meta name="description" content="在AI时代重新定义思考">
 <meta property="og:type" content="website">
-<meta property="og:title" content="My Home">
-<meta property="og:description" content="">
+<meta property="og:title" content="Wyc的世界">
+<meta property="og:description" content="在AI时代重新定义思考">
 <meta property="og:image" content="assets/og.jpg">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="assets/favicon.png">
 <link rel="stylesheet" href="engine/style.css">
+<link rel="stylesheet" href="world/computer.css">
+<link rel="stylesheet" href="world/fishing.css">
+<link rel="stylesheet" href="world/furniture.css">
+<link rel="stylesheet" href="world/jet-ski.css">
+<link rel="stylesheet" href="world/resident.css">
 <script type="importmap">{"imports":{
   "three":"./vendor/three/three.module.min.js",
   "@engine/":"./engine/",
@@ -24,21 +29,28 @@
 }}</script>
 </head>
 <body>
-<main id="world" aria-label="My Home"></main>
+<main id="world" aria-label="Wyc Home" data-zh-label="Wyc的世界"></main>
 <div id="loading"><div class="bar"><i></i></div></div>
 
 <section id="pages">
-  <h1 class="plain-title">My Home</h1>
+  <h1 class="plain-title" data-zh="Wyc的世界">Wyc Home</h1>
 
   <article class="page" data-station="about">
     <h2 data-zh="关于我">About me</h2>
     <div class="about">
       <div class="about-text" lang="en">
-        <p>Add your introduction</p>
+        <p>I'm Wyc . <br>
+          a music software developer. <br>
+          I enjoy turning ideas into reality with AI. <br>
+          Welcome to my space, and feel free<br>
+          to drop a message.</p>
         <div class="about-foot"><a class="mc-button" href="#contact" data-open="phone">Follow</a><a class="mc-button" href="#mailbox" data-open="mailbox">Mailbox</a></div>
       </div>
       <div class="about-text" lang="zh-CN">
-        <p>填写你的介绍</p>
+        <p>我是 Wyc。<br>
+          主业 音乐相关开发。<br>
+          擅长使用AI实现自己的想法<br>
+          欢迎进来逛逛，顺手留个言。</p>
         <div class="about-foot"><a class="mc-button" href="#contact" data-open="phone">关注</a><a class="mc-button" href="#mailbox" data-open="mailbox">留言</a></div>
       </div>
     </div>
@@ -46,7 +58,32 @@
 
   <article class="page" data-station="blog" data-icon="blog">
     <h2 data-zh="个人主页">Website</h2>
-    <div class="placeholder-card"><p data-zh="填写你的个人主页链接">Add your website link</p></div>
+    <div class="placeholder-card"><a href="https://wyc21.com" target="_blank" rel="noopener">
+      hello
+    </a></div>
+  </article>
+
+  <article class="page" data-station="computer" data-icon="works">
+    <h2 data-zh="电脑">Computer</h2>
+    <section class="computer-desktop" data-computer-desktop aria-label="Computer desktop" data-zh-label="电脑桌面">
+      <div class="computer-wallpaper" aria-hidden="true"><i></i><i></i><i></i></div>
+      <div class="computer-topbar"><span>HOMECRAFT / DESKTOP</span><span data-zh="个人工作空间">Personal workspace</span></div>
+      <div class="computer-workspace">
+        <div class="computer-welcome">
+          <span class="computer-eyebrow">MAKE · PLAY · EXPLORE</span>
+          <h3 data-zh="欢迎回到桌面">Welcome to your desktop</h3>
+          <p data-zh="写点代码，或是玩一会儿。">A little code. A little play.</p>
+        </div>
+        <nav class="computer-filters" aria-label="App categories" data-zh-label="应用分类">
+          <button class="mc-button" type="button" data-computer-filter="all" aria-pressed="true" data-zh="全部应用">All apps</button>
+          <button class="mc-button" type="button" data-computer-filter="dev" aria-pressed="false" data-zh="开发">Develop</button>
+          <button class="mc-button" type="button" data-computer-filter="games" aria-pressed="false" data-zh="游戏">Games</button>
+        </nav>
+        <div class="computer-apps" data-computer-apps></div>
+        <p class="computer-status" data-computer-status role="status" aria-live="polite" data-zh="单击应用打开，新标签页不会打断你逛小岛。">Click an app to open a new tab. Your island stays here.</p>
+      </div>
+      <footer class="computer-taskbar"><span class="computer-start"><img data-icon="works" alt="" width="24" height="24"><b data-zh="工作台">Workspace</b></span><span class="computer-taskbar-hint" data-zh="ESC 返回小岛">ESC to return</span><time data-computer-clock></time></footer>
+    </section>
   </article>
 
   <article class="page" data-station="piano" data-icon="works" data-piano>
@@ -58,9 +95,9 @@
 
   <article class="page" id="contact" data-station="contact">
     <h2 data-zh="关注">Follow</h2>
-    <p data-zh="填写你的联系方式">Add your contact details</p>
+    <p data-zh="你可以通过 GitHub 或邮箱联系我：wyc@linux.do">Find me on GitHub or email me at wyc@linux.do.</p>
     <ul class="contact">
-      <li data-app="github"><span>GitHub</span><a data-zh="填写 GitHub 链接">Add your GitHub link</a><p></p></li>
+      <li data-app="github"><span>GitHub</span><a href="https://github.com/WYC210" target="_blank" rel="noopener">@WYC210</a><p data-zh="我的开源项目">My open-source projects</p></li>
     </ul>
   </article>
 

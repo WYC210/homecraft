@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { createTradingArt, TRADING_ART } from './lehun-trading-art.js';
+import { addRestPoint } from './rest-points.js';
 
 export function buildTradingStudio({ B, foot, bake, floor }) {
   const wood = { tex: 'wood_panel', tint: 0xc5b499, emissive: 0.1 };
@@ -124,6 +125,7 @@ export function buildTradingStudio({ B, foot, bake, floor }) {
   B.box(12.2, floor + 0.51, 48.01, 2.5, 0.49, 0.12, green);
   B.box(11.3, floor + 0.52, 47.91, 0.38, 0.3, 0.1, linen, { ry: 0.15 });
   foot(12.2, 47.7, 2.6, 0.85);
+  for (const offset of [-0.62, 0.62]) addRestPoint({ id: `lehun-sofa-${offset}`, name: '乐魂沙发', en: 'LeHun sofa', x: 12.2 + offset, y: floor + 0.51, z: 47.65, floor, yaw: Math.PI });
   B.box(12.2, floor + 0.42, 45.6, 1.25, 0.05, 0.6, wood);
   for (const offsetX of [-0.51, 0.51]) {
     for (const offsetZ of [-0.21, 0.21]) B.box(12.2 + offsetX, floor + 0.02, 45.6 + offsetZ, 0.045, 0.4, 0.045, metal);

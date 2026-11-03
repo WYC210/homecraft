@@ -1,7 +1,8 @@
 // Small beach details that make the open sand read as a lived-in shoreline.
 // Everything stays in the shared model batch so the decoration costs no extra
 // draw call beyond the existing furniture group.
-import { PORTAL, IKUN_ENTRY } from './layout.js';
+import { PORTAL, IKUN_ENTRY, BOARDWALK } from './layout.js';
+import { addRestPoint } from './rest-points.js';
 
 const OAK = { tex: 'oak' };
 const WALNUT = { tex: 'walnut' };
@@ -62,6 +63,7 @@ export function furnishBeach({ B, obstacles, bakes }) {
       B.box(0.3, 0.02, 0, 0.07, 0.22, 1.15, WALNUT);
     });
     foot(x, z, 0.95, 1.6);
+    addRestPoint({ id: `beach-lounger-${x}`, name: '沙滩躺椅', en: 'Beach lounger', x, y: 0.37, z, yaw: ry, kind: 'recline' });
   }
 
   function picnicTable(x, z) {
@@ -72,6 +74,9 @@ export function furnishBeach({ B, obstacles, bakes }) {
       B.box(x + dx, 0.02, z + dz, 0.12, 0.62, 0.12, WALNUT, { rz: dx > 0 ? -0.12 : 0.12 });
     }
     foot(x, z, 2.7, 2.2);
+    for (const side of [-1, 1]) for (const offset of [-0.65, 0.65]) {
+      addRestPoint({ id: `beach-picnic-${side}-${offset}`, name: '野餐长凳', en: 'Picnic bench', x: x + offset, y: 0.74, z: z + side * 0.82, yaw: side < 0 ? 0 : Math.PI });
+    }
   }
 
   function firePit(x, z) {
@@ -129,6 +134,9 @@ export function furnishBeach({ B, obstacles, bakes }) {
       bake('beach-pavilion-' + x + '-' + dx, x + dx, 2.8, z, 2.2, 6);
     }
     foot(x, z, 4.9, 3.4);
+    for (const side of [-1, 1]) for (const offset of [-1, 0, 1]) {
+      addRestPoint({ id: `beach-pavilion-${side}-${offset}`, name: '凉亭长凳', en: 'Pavilion bench', x: x + offset, y: 0.78, z: z + side * 0.95, yaw: side < 0 ? 0 : Math.PI });
+    }
   }
 
   function volleyball(x, z) {
@@ -181,8 +189,8 @@ export function furnishBeach({ B, obstacles, bakes }) {
   for (let z = 19; z < 25; z += 0.85) B.box(0.5, 0.025, z, 1.25, 0.06, 0.46, DECK);
   for (let z = 24.7; z < 28; z += 0.85) B.box(4.1, 0.025, z, 5.8, 0.06, 0.46, DECK);
   // The shore boardwalk gives the beach a readable edge without enclosing it.
-  for (let x = -31; x <= 31; x += 1.5) {
-    B.box(x, 0.06, 28.25, 1.34, 0.1, 1.9, DECK);
+  for (let x = BOARDWALK.x0; x <= BOARDWALK.x1; x += BOARDWALK.step) {
+    B.box(x, 0.06, BOARDWALK.z, BOARDWALK.width, 0.1, BOARDWALK.depth, DECK);
     if (x % 6 === 5 || x % 6 === -1) {
       B.box(x, 0.06, 27.22, 0.12, 1.05, 0.12, WALNUT);
       B.box(x, 1.12, 27.22, 0.18, 0.2, 0.18, glow(0xffd69b));
@@ -319,6 +327,7 @@ export function furnishBeach({ B, obstacles, bakes }) {
     B.box(-0.55, 0.42, 0, 0.08, 0.08, 1.5, WALNUT, { rz: -0.15 });
   });
   foot(-14, 26, 1.2, 2.5);
+  for (const offset of [-0.5, 0.5]) addRestPoint({ id: `beach-boat-${offset}`, name: '小船座位', en: 'Rowboat seat', x: -14 + Math.sin(0.3) * offset, y: 0.44, z: 26 + Math.cos(0.3) * offset, yaw: 0.3 });
 
   // Sand castle
   B.at(20, 0, 20, 0, () => {

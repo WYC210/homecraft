@@ -595,6 +595,7 @@ async function boot() {
       const target = zipTarget(x, y);
       if (target) return webTo(target);
     }
+    if (extras.tap?.(x, y, target)) return;
     const { block, island, water } = target;
     if (water) return navigate(water.x, water.z, POOL.water);
     if (island?.site === 'roof-ladder') {
@@ -608,6 +609,8 @@ async function boot() {
   // Walk if the place is reachable on foot from here; otherwise fly there.
   function navigate(x, z, targetY = null) {
     closePage(); minimap.toggleBig(false); input.clear(); rig.skipIntro();
+    if (player.vehicle && !player.dismountVehicle()) return false;
+    if (player.resting && !player.standUp()) return false;
     // The pool: swim there; from the deck walk to its side and dive in, from
     // anywhere else fly over and drop in. Swimming, a place on land is
     // reached by climbing out on the nearest side first.
@@ -831,8 +834,9 @@ async function boot() {
   const input = createInput(stage.renderer.domElement, {
     blocked: () => minimap.isBigOpen() || panel.open || weatherMenuOpen() || isTravelling() || !!portal?.busy,
     shortcutsBlocked: () => minimap.isBigOpen() || weatherMenuOpen() || isTravelling() || !!portal?.busy,
-    escape: () => { if (weatherMenuOpen()) toggleWeatherMenu(false, true); else if (minimap.isBigOpen()) minimap.toggleBig(false); else if (panel.open) closePage(); else if (phone.up) { if (!phone.back()) togglePhone(false); } else toggleWeb(false); },
+    escape: () => { if (weatherMenuOpen()) toggleWeatherMenu(false, true); else if (minimap.isBigOpen()) minimap.toggleBig(false); else if (panel.open) closePage(); else if (phone.up) { if (!phone.back()) togglePhone(false); } else if (player.vehicle) player.dismountVehicle(); else if (player.resting) player.standUp(); else toggleWeb(false); },
     interact: () => {
+      if (extras.interact?.()) return;
       const s = nearestTarget();
       if (s) { useTarget(s.id); return; }
       // First person: whatever sits under the crosshair.
@@ -853,7 +857,7 @@ async function boot() {
     tap,
     hover: (x, y) => hover(x, y, true),
     anyKey: () => rig.skipIntro(),
-    pad: () => flightPad?.state,
+    pad: () => extras.pad?.() || flightPad?.state,
     debug: toggleF3,
   });
 
@@ -1000,7 +1004,7 @@ async function boot() {
     // Looking up through their own eyes from the pool's floor, as in first
     // person, their body is out of the way.
     avatar.root.visible = !fp && rig.gazeAmount < 0.7;
-    avatar.blob.visible = !fp && !player.swimming;
+    avatar.blob.visible = !fp && !player.swimming && !player.resting && !player.vehicle;
     crosshair.hidden = !fp;
     viewButton.setAttribute('aria-pressed', String(fp));
     syncFlyButton();

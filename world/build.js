@@ -1,7 +1,7 @@
 import { BoxBatch } from '@engine/world/blocks.js';
 import { buildIsland } from '@engine/world/terrain.js';
 import { buildForest, buildTufts } from '@engine/world/landscape.js';
-import { ISLAND, LAND, BAY, TREES, MODEL_ORIGIN, IKUN_CENTER, IKUN_ENTRY, LEHUN_ORIGIN, ORIGIN_GONGLU, ORIGIN_FERRIS } from './layout.js';
+import { ISLAND, LAND, BAY, BOARDWALK, TREES, MODEL_ORIGIN, IKUN_CENTER, IKUN_ENTRY, LEHUN_ORIGIN, ORIGIN_GONGLU, ORIGIN_FERRIS } from './layout.js';
 import { buildLitematicIKUN } from './ikun-model.js';
 import { buildLitematicLEHUN } from './lehun-model.js';
 import { buildLitematicGONGLU } from './gonglu-model.js';
@@ -10,6 +10,13 @@ import { buildSeaToys } from './sea.js';
 import { furnishGONGLU } from './gonglu-furnish.js';
 import { furnishLeHun } from './lehun-furnish.js';
 import { furnishBeach } from './beach-furnish.js';
+import { createComputer } from './computer.js';
+import { createFishing } from './fishing.js';
+import { REST_POINTS } from './rest-points.js';
+import { createFurnitureInteraction } from './furniture-interaction.js';
+import { createJetSki } from './jet-ski.js';
+import { furnishIKUN } from './ikun-furnish.js';
+import { createResident } from './resident.js';
 
 // Two cottages rebuilt one-to-one from litematics. The palette keeps every
 // block's properties, so stairs, slabs, doors, panes and lanterns come out as
@@ -18,6 +25,7 @@ import { furnishBeach } from './beach-furnish.js';
 let toys = null;
 
 export function build({ grid, layer, materials, stage }) {
+  REST_POINTS.length = 0;
   defineModelBlocks(grid);
   // The whole island is a sand beach; terrain keeps its original coast (LAND)
   // while the grid (ISLAND) reaches further south to hold the bay floor.
@@ -31,7 +39,7 @@ export function build({ grid, layer, materials, stage }) {
   // The ocean ring: a sand sea floor under the swimmable water that
   // surrounds the island on all four sides.
   for (let x = ISLAND.x0; x < ISLAND.x1; x++) for (let z = ISLAND.z0; z < ISLAND.z1; z++) {
-    if (x >= LAND.x0 && x < LAND.x1 && z >= LAND.z0 && z < LAND.z1) continue;
+    if (grid.type(x, -1, z)) continue;
     grid.fill(x, -5, z, x + 1, -3, z + 1, 'sand');
   }
   const B = new BoxBatch(layer);
@@ -287,7 +295,14 @@ export function build({ grid, layer, materials, stage }) {
   // LeHun cottage: a cherry gym below and a leisure loft above — its floor
   // pink lounge floor and stair register site treads into `walk` before the
   // site is built.
+  for (let x = Math.floor(BOARDWALK.x0 - BOARDWALK.width / 2); x < Math.ceil(BOARDWALK.x1 + BOARDWALK.width / 2); x++) {
+    for (let z = Math.floor(BOARDWALK.z - BOARDWALK.depth / 2); z < BAY.z0; z++) {
+      grid.set(x, -1, z, 'sand');
+      grid.set(x, 0, z, null);
+    }
+  }
   const planes = furnishGONGLU({ B, obstacles, bakes, surfaces, hotspots });
+  furnishIKUN({ B, obstacles, bakes });
   planes.push(...furnishLeHun({ B, walk, obstacles, bakes }));
   planes.push(tuftsMesh);
   furnishBeach({ B, obstacles, bakes });
@@ -304,8 +319,19 @@ export function build({ grid, layer, materials, stage }) {
 }
 
 // The floats ride the swell.
-export function setup({ stage }) {
-  return { update(dt) { toys?.update(dt, stage.camera); } };
+export function setup({ stage, config, player, avatar, rig, sound, world, nav }) {
+  createComputer(config.computer);
+  const fishing = createFishing({ stage, player, avatar, rig, sound });
+  const furniture = createFurnitureInteraction({ stage, player, rig, sound, world });
+  const jetSki = createJetSki({ stage, player, rig, sound, world, toys });
+  const resident = createResident({ stage, world, nav, player, jetSki, config });
+  return {
+    fishing, furniture, jetSki, resident,
+    interact: () => jetSki.interact() || furniture.interact(),
+    tap: (x, y, picked) => jetSki.tap(x, y, picked) || furniture.tap(x, y, picked),
+    pad: jetSki.pad,
+    update(dt) { toys?.update(dt, stage.camera); fishing.update(dt); furniture.update(dt); jetSki.update(dt); resident?.update(dt); },
+  };
 }
 
 // ——— IKUN cottage (8×15×17) ———

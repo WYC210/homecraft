@@ -99,7 +99,7 @@ export default {
   name: '暖屿',
   skin: 'assets/me.png',
   languages: ['zh', 'en'],
-  weather: { city: '上海', cityEn: 'Shanghai', latitude: 31.23, longitude: 121.47, timezone: 'Asia/Shanghai' },,
+  weather: { city: '上海', cityEn: 'Shanghai', latitude: 31.23, longitude: 121.47, timezone: 'Asia/Shanghai' },
   dock: ['blog', 'about', 'mailbox', 'phone'],
   mailbox: {
     endpoint: '',
@@ -119,6 +119,7 @@ export default {
 - `dock`：底部 Dock 快捷入口。这里填写页面或功能对应的 ID，建议先保留项目中已有的配置。
 - `mailbox`：留言板配置，见下一节。
 - `badge`：是否显示 Homecraft 标识。`true` 显示，`false` 隐藏。
+- `resident`：IKUN 房屋中的 NPC 配置。`enabled` 控制是否启用，`name` 是招呼气泡中的名字，`skin` 使用 64×64 的 Minecraft 皮肤 PNG；不填写时默认使用示例人物皮肤。
 
 实时天气示例：
 
@@ -132,6 +133,22 @@ weather: {
 },
 ```
 
+### 海边钓鱼
+
+走到南岸任一块木板上停下，会出现“钓鱼”提示。按 **F** 或点击提示抛竿；浮漂下沉、出现“鱼儿咬钩了”时，再按 **F** 或点击“收竿”。提前收竿或错过咬钩不会获得鱼。
+
+移动、跳跃、飞行、打开地图或页面会取消钓鱼，也可以按 **Esc** 主动取消。本次收获只在当前访问中计数，刷新后重置。手机端按钮位于左下角快捷栏上方，避开右下角小地图。
+
+木板的位置由 `world/layout.js` 中的 `BOARDWALK` 定义，模型和钓鱼范围共用这份数据；抛竿、等待和收鱼逻辑在 `world/fishing.js`，界面样式在 `world/fishing.css`。
+
+### 摩托艇驾驶
+
+靠近海上的红白色摩托艇，在水面按 **F** 或点击“驾驶摩托艇”上艇。电脑端 **W/S** 前进和倒退，**A/D** 转向，**Shift** 加速，**空格** 刹车；按 **F** 或 **Esc** 下艇。
+
+手机端使用左侧圆形轮盘：上推前进、下拉倒退、左右拖动转向，拖动幅度控制力度，松手回中。右侧保留“加速”和“刹车”，下艇按钮位于快捷栏上方，避开小地图。打开地图、手机或页面时暂停驾驶输入。
+
+摩托艇按实际地形检测水域和碰撞，不使用矩形海岸边界；靠岸后可以低速转向、倒退离开。驾驶逻辑和样式分别在 `world/jet-ski.js`、`world/jet-ski.css`。
+
 ## 四、留言板配置
 
 ### 方式一：使用邮箱 App
@@ -141,7 +158,7 @@ weather: {
 ```js
 mailbox: {
   endpoint: '',
-  email: 'your-email@example.com',
+  email: 'wyc@linux.do',
   turnstileSitekey: '',
 },
 ```

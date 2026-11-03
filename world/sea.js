@@ -85,6 +85,8 @@ export function buildSeaToys(layer, materials) {
 
   return {
     group: root,
+    ski,
+    duck,
     foot: { x: 15, z: -25.2 },
     levels(x, z, out) {
       for (const { rect } of boxes) {
@@ -108,9 +110,6 @@ export function buildSeaToys(layer, materials) {
       duck.position.y = WATER - 0.08 + Math.sin(t * 0.9) * 0.06;
       duck.rotation.z = Math.sin(t * 0.7) * 0.05;
       duck.rotation.x = Math.sin(t * 0.5) * 0.03;
-      ski.position.y = WATER - 0.12 + Math.sin(t * 1.1 + 1.7) * 0.05;
-      ski.rotation.z = Math.sin(t * 0.8 + 0.6) * 0.045;
-      ski.rotation.x = Math.sin(t * 0.6) * 0.025;
     },
   };
 }
