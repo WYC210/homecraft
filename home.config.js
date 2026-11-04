@@ -11,8 +11,8 @@ export default {
   computer: {
     apps: [
       { id: 'github', name: 'GitHub', en: 'GitHub', category: 'dev', icon: 'github', url: 'https://github.com/WYC210' },
-      { id: 'game-1', name: '我的游戏 1', en: 'My game 1', category: 'games', icon: 'works', url: '' },
-      { id: 'game-2', name: '我的游戏 2', en: 'My game 2', category: 'games', icon: 'works', url: '' },
+      { id: 'game-1', name: '余烬行囊', en: 'Ember Satchel', category: 'games', icon: 'works', url: 'https://game.wyc21.com/' },
+      { id: 'game-2', name: 'echoes', en: 'echoes', category: 'dev', icon: 'works', url: 'https://blog.wyc21.com/' },
       { id: 'game-3', name: '我的游戏 3', en: 'My game 3', category: 'games', icon: 'works', url: '' },
     ],
   },

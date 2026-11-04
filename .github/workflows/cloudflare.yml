@@ -1,5 +1,5 @@
 # Deploy the static Homecraft site to Cloudflare Pages after pushes to the
-# production branch. The Pages project must be created once in Cloudflare.
+# production branch. Wrangler creates the Pages project on the first deploy.
 name: Cloudflare Pages
 
 on:
@@ -34,4 +34,6 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_PAGES_PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT }}
-        run: npx --yes wrangler pages deploy dist --project-name "$CLOUDFLARE_PAGES_PROJECT"
+        run:
+          npx --yes wrangler pages project create "$CLOUDFLARE_PAGES_PROJECT" --production-branch main || true
+          npx --yes wrangler pages deploy dist --project-name "$CLOUDFLARE_PAGES_PROJECT"

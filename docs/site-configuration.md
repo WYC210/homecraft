@@ -208,7 +208,7 @@ Repository Variable：
 
 - `CLOUDFLARE_PAGES_PROJECT`：Cloudflare Pages 项目名称。
 
-Cloudflare Pages 项目需要先创建一次，之后每次推送到 `main` 或 `master` 就会自动部署。
+首次推送时，Wrangler CLI 会根据 `CLOUDFLARE_PAGES_PROJECT` 自动创建 Cloudflare Pages 项目；之后每次推送到 `main` 或 `master` 就会自动部署。
 
 ## 六、当前项目优先填写清单
 
